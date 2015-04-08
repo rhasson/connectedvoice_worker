@@ -19,7 +19,7 @@ module.exports = handlers = {
 			});
 		},
 		callActionHandler: function(request, reply, next) {
-			callActionResponse.then(function(resp) {
+			helpers.scallActionResponse.then(function(resp) {
 				//TODO
 				reply.send(200);
 				return next();
