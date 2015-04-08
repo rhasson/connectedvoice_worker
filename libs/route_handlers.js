@@ -13,14 +13,17 @@ module.exports = handlers = {
 			});
 		},
 		callStatusHandler: function(request, reply, next) {
-			console.log('CALL STATUS HANDLER: ', request.params);
 			helpers.callStatusResponse(request.params).then(function(resp) {
 				 reply.send(200);
 				 return next();
 			});
 		},
 		callActionHandler: function(request, reply, next) {
-			//todo
+			callActionResponse.then(function(resp) {
+				//TODO
+				reply.send(200);
+				return next();
+			});
 		}
 	}
 }
