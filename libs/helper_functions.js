@@ -71,14 +71,14 @@ module.exports = helpers = {
 		function create(item, twiml) {
 			switch (item.verb) {
 				case 'say':
-					twiml.say(item.nouns.text, item.attributes);
+					twiml.say(item.nouns.text, item.verb_attributes);
 					break;
 				case 'dial':
-					if (!('action' in item.attributes)) {
-						item.attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-						item.attributes.action += '/dial';
+					if (!('action' in item.verb_attributes)) {
+						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
+						item.verb_attributes.action += '/dial';
 					}
-					twiml.dial(item.attributes, function(node) {
+					twiml.dial(item.verb_attributes, function(node) {
 						if ('number' in item.nouns) {
 							item.nouns.number.forEach(function(num) { node.number(num); });
 						} else node.text = item.nouns.text;
@@ -88,11 +88,11 @@ module.exports = helpers = {
 					twiml.hangup();
 					break;
 				case 'gather':
-					if (!('action' in item.attributes)) {
-						item.attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-						item.attributes.action += '/gather';
+					if (!('action' in item.verb_attributes)) {
+						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
+						item.verb_attributes.action += '/gather';
 					}
-					twiml.gather(item.attributes, function(node) {
+					twiml.gather(item.verb_attributes, function(node) {
 						if ('nested' in item && item.nested.length) {
 							item.nested.forEach(function(child) {
 								node = create(child, node);
@@ -101,18 +101,18 @@ module.exports = helpers = {
 					});
 					break;
 				case 'pause':
-					twiml.pause(item.attributes);
+					twiml.pause(item.verb_attributes);
 					break;
 				case 'reject':
-					twiml.pause(item.attributes);
+					twiml.pause(item.verb_attributes);
 					break;
 				case 'message':
-					if (!('action' in item.attributes)) {
-						item.attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-						item.attributes.action += '/message';
+					if (!('action' in item.verb_attributes)) {
+						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
+						item.verb_attributes.action += '/message';
 					}
-					if (!('statusCallback' in item.attributes)) item.attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
-					twiml.message(item.nouns.body, item.attributes);
+					if (!('statusCallback' in item.verb_attributes)) item.verb_attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
+					twiml.message(item.nouns.body, item.verb_attributes);
 					break;
 			}
 		}
