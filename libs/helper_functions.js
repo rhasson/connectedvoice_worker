@@ -65,8 +65,10 @@ module.exports = helpers = {
 	},
 	buildIvrTwiml: function(actions, userid) {
 		var rTwiml = TwimlResponse();
-		
-		actions.forEach(function(item) { create(item, rTwiml); });
+
+		for (var i=0; i < actions.length; i++) {
+			create(actions[i], rTwiml);
+		}
 
 		function create(item, twiml) {
 			switch (item.verb) {
@@ -80,7 +82,9 @@ module.exports = helpers = {
 					}
 					twiml.dial(item.verb_attributes, function(node) {
 						if ('number' in item.nouns) {
-							item.nouns.number.forEach(function(num) { node.number(num); });
+							for (var j=0; j < item.nouns.number.length; j++) {
+								node.number(item.nouns.number[j]);	
+							}
 						} else node.text = item.nouns.text;
 					});
 					break;
@@ -94,9 +98,9 @@ module.exports = helpers = {
 					}
 					twiml.gather(item.verb_attributes, function(node) {
 						if ('nested' in item && item.nested.length) {
-							item.nested.forEach(function(child) {
-								node = create(child, node);
-							});
+							if (var j=0; j < item.nested.length; j++) {
+								node = create(item.nested[j], node);
+							}
 						}
 					});
 					break;
