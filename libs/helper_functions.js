@@ -98,7 +98,7 @@ module.exports = helpers = {
 					}
 					twiml.gather(item.verb_attributes, function(node) {
 						if ('nested' in item && item.nested.length) {
-							if (var j=0; j < item.nested.length; j++) {
+							for (var j=0; j < item.nested.length; j++) {
 								node = create(item.nested[j], node);
 							}
 						}
