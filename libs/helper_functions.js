@@ -16,6 +16,8 @@ var dbinsert = whennode.lift(db.insert),
 	dbget = whennode.lift(db.get),
 	dbremove = whennode.lift(db.destroy);
 
+var CACHE = [];
+
 module.exports = helpers = {
 	voiceCallResponse: function(params) {
 		var id;
@@ -34,10 +36,15 @@ module.exports = helpers = {
 			.then(function(resp) {
 				var doc = resp.shift();
 				var tResp = helpers.buildIvrTwiml(doc.actions, params.id);
-				return when.resolve(tResp.toString());
+				return when.resolve(tResp);
 			})
 			.catch(function(err) {
-				return when.reject(new Error('VoiceCallResponse: Failed to get record from DB - '+err));
+				var msg, tResp;
+				console.log('voiceCallResponse ERROR: ', err);
+				msg = (err instanceof Error) ? err.message : err
+				tResp = helpers.buildErrorTwiml(msg);
+				return when.resolve(tResp);
+				//return when.reject(new Error('VoiceCallResponse: Failed to get record from DB - '+err));
 			});
 		}
 	},
@@ -61,7 +68,85 @@ module.exports = helpers = {
 	},
 	callActionResponse: function(params) {
 		console.log('ACTION REQUEST: PARAMS: ', params);
-		return when.resolve();
+		var id = new Buffer(params.id, 'base64').toString('utf8');
+		var tResp, actions, gather;
+
+		if (CACHE[id]) {
+			//found entry in cache, build and respond with twiml
+			//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
+			gather = CACHE[id].gather;
+
+			if (gather.index === params.index) {
+				//get the actions array based on the pressed ivr digit
+				actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
+
+				tResp = helpers.buildIvrTwiml(actions, params.id);
+
+				return when.resolve(tResp);
+			}
+		}
+		//entry not in cache, query database, cache entry and respond with twiml
+		return dbget(id).then(function(resp) {
+			var doc = resp.shift();
+			var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: params.To}), 'ivr_id');
+			console.log('IVR ID: ', ivr_id)
+			
+			if (ivr_id !== undefined) {
+				CACHE[id] = {id: ivr_id};
+				return dbget(ivr_id);
+			}
+			else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
+		})
+		.then(function(resp) {
+			var doc = resp.shift();
+			var tResp, actions, gather;
+
+			//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
+			gather = _.find(doc.actions, 'index', params.index);
+			//cache it for future API calls
+			CACHE[id].gather = gather;
+			//get the actions array based on the pressed ivr digit
+			actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
+
+			tResp = helpers.buildIvrTwiml(actions, params.id);
+
+			return when.resolve(tResp);
+		})
+		.catch(function(err) {
+			var msg, tResp;
+			console.log('callActionResponse ERROR: ', err);
+			msg = (err instanceof Error) ? err.message : err
+			tResp = helpers.buildErrorTwiml(msg);
+			return when.resolve(tResp);
+			//return when.reject(new Error('VoiceCallResponse: Failed to get record from DB - '+err));
+		});
+
+
+/*
+		params.id = id;
+		params.type = 'action_status';
+		
+
+
+		//TODO save a db record to track IVR interactions
+		return dbinsert(params).then(function(doc) {
+			var body = doc.shift();
+			if (!('ok' in body) || !body.ok) {
+				console.log('Failed to save call action record to DB: ', body);
+			}
+
+		});		
+*/		
+	},
+	buildErrorTwiml: function(message) {
+		var rTwiml = TwimlResponse();
+		rTwiml.say(message, {
+			voice: 'Woman',
+			loop: 1,
+			language: 'en'
+		});
+		rTwiml.hangup();
+		return rTwiml.toString();
 	},
 	buildIvrTwiml: function(actions, userid) {
 		var rTwiml = TwimlResponse();
@@ -93,7 +178,7 @@ module.exports = helpers = {
 					break;
 				case 'gather':
 					if (!('action' in item.verb_attributes)) {
-						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
+						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid) + '/' + item.index;
 						item.verb_attributes.action += '/gather';
 					}
 					twiml.gather(item.verb_attributes, function(node) {

@@ -20,8 +20,8 @@ module.exports = handlers = {
 		},
 		callActionHandler: function(request, reply, next) {
 			helpers.callActionResponse(request.params).then(function(resp) {
-				//TODO
-				reply.send(200);
+				reply.setHeader('content-type', 'application/xml');
+				reply.end(resp);
 				return next();
 			});
 		}
