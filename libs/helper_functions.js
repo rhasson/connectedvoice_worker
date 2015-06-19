@@ -18,6 +18,8 @@ var dbinsert = whennode.lift(db.insert),
 
 var CACHE = [];
 
+_.templateSettings.interpolate = /{([\s\S]+?)}/g;
+
 module.exports = helpers = {
 	voiceCallResponse: function(params) {
 		var id;
@@ -35,7 +37,7 @@ module.exports = helpers = {
 			})
 			.then(function(resp) {
 				var doc = resp.shift();
-				var tResp = helpers.buildIvrTwiml(doc.actions, params.id);
+				var tResp = helpers.buildIvrTwiml(doc.actions, params.id, params);
 				return when.resolve(tResp);
 			})
 			.catch(function(err) {
@@ -80,7 +82,7 @@ module.exports = helpers = {
 				//get the actions array based on the pressed ivr digit
 				actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
 
-				tResp = helpers.buildIvrTwiml(actions, params.id);
+				tResp = helpers.buildIvrTwiml(actions, params.id, params);
 
 				return when.resolve(tResp);
 			}
@@ -108,7 +110,7 @@ module.exports = helpers = {
 			//get the actions array based on the pressed ivr digit
 			actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
 
-			tResp = helpers.buildIvrTwiml(actions, params.id);
+			tResp = helpers.buildIvrTwiml(actions, params.id, params);
 
 			return when.resolve(tResp);
 		})
@@ -148,17 +150,20 @@ module.exports = helpers = {
 		rTwiml.hangup();
 		return rTwiml.toString();
 	},
-	buildIvrTwiml: function(actions, userid) {
+	buildIvrTwiml: function(actions, userid, params) {
 		var rTwiml = TwimlResponse();
+		var params = cleanUp(params);
 
 		for (var i=0; i < actions.length; i++) {
 			create(actions[i], rTwiml);
 		}
 
 		function create(item, twiml) {
+			var tmpl = undefined;
 			switch (item.verb) {
 				case 'say':
-					twiml.say(item.nouns.text, item.verb_attributes);
+					tmpl = _.template(item.nouns.text);
+					twiml.say(tmpl(params), item.verb_attributes);
 					break;
 				case 'dial':
 					if (!('action' in item.verb_attributes)) {
@@ -201,9 +206,23 @@ module.exports = helpers = {
 						item.verb_attributes.action += '/message';
 					}
 					if (!('statusCallback' in item.verb_attributes)) item.verb_attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
-					twiml.message(item.nouns.body, item.verb_attributes);
+					tmpl = _.template(item.nouns.body);
+					twiml.message(tmpl(params), item.verb_attributes);
 					break;
 			}
+		}
+
+		function cleanUp(p) {
+			var datetime = new Date();
+			return obj = {
+				caller: p.Caller,
+				callee: p.Called,
+				digits: p.Digits,
+				datetime: datetime,
+				time: datetime.toTimeString(),
+				date: datetime.toDateString()
+			};
+
 		}
 		return rTwiml.toString();
 	}
