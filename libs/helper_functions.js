@@ -103,8 +103,15 @@ module.exports = helpers = {
 			var doc = resp.shift();
 			var tResp, actions, gather;
 
-			//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
-			gather = _.find(doc.actions, 'index', params.index);
+			if (params.index) {
+				//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
+				gather = _.find(doc.actions, 'index', params.index);
+			}
+			if (!gather) { 
+				//if we can't find the requested gather verb, grab the first one in the IVR
+				gather = _.find(doc.actions, 'verb', 'gather');
+			}
+			console.log('GATHER: ', gather)
 			//cache it for future API calls
 			CACHE[id].gather = gather;
 			//get the actions array based on the pressed ivr digit
@@ -150,9 +157,9 @@ module.exports = helpers = {
 		rTwiml.hangup();
 		return rTwiml.toString();
 	},
-	buildIvrTwiml: function(actions, userid, params) {
+	buildIvrTwiml: function(actions, userid, vars) {
 		var rTwiml = TwimlResponse();
-		var params = cleanUp(params);
+		var params = cleanUp(vars);
 
 		for (var i=0; i < actions.length; i++) {
 			create(actions[i], rTwiml);
@@ -163,13 +170,12 @@ module.exports = helpers = {
 			switch (item.verb) {
 				case 'say':
 					tmpl = _.template(item.nouns.text);
-					twiml.say(tmpl(params), item.verb_attributes);
+					twiml.say(tmpl(p), item.verb_attributes);
 					break;
 				case 'dial':
-					if (!('action' in item.verb_attributes)) {
+						item.verb_attributes.method = "POST"
 						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-						item.verb_attributes.action += '/dial';
-					}
+						item.verb_attributes.action += '/' + item.index;
 					twiml.dial(item.verb_attributes, function(node) {
 						if ('number' in item.nouns) {
 							for (var j=0; j < item.nouns.number.length; j++) {
@@ -182,10 +188,10 @@ module.exports = helpers = {
 					twiml.hangup();
 					break;
 				case 'gather':
-					if (!('action' in item.verb_attributes)) {
-						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid) + '/' + item.index;
-						item.verb_attributes.action += '/gather';
-					}
+					console.log('ITEM: ', item)
+					item.verb_attributes.method = "POST";
+					item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
+					item.verb_attributes.action += '/' + item.index;
 					twiml.gather(item.verb_attributes, function(node) {
 						if ('nested' in item && item.nested.length) {
 							for (var j=0; j < item.nested.length; j++) {
@@ -201,11 +207,10 @@ module.exports = helpers = {
 					twiml.pause(item.verb_attributes);
 					break;
 				case 'message':
-					if (!('action' in item.verb_attributes)) {
-						item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-						item.verb_attributes.action += '/message';
-					}
-					if (!('statusCallback' in item.verb_attributes)) item.verb_attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
+					item.verb_attributes.method = 'POST';
+					item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
+					item.verb_attributes.action += '/' + item.index;
+					item.verb_attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
 					tmpl = _.template(item.nouns.body);
 					twiml.message(tmpl(params), item.verb_attributes);
 					break;
