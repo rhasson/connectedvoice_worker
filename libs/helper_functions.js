@@ -170,7 +170,7 @@ module.exports = helpers = {
 			switch (item.verb) {
 				case 'say':
 					tmpl = _.template(item.nouns.text);
-					twiml.say(tmpl(p), item.verb_attributes);
+					twiml.say(tmpl(params), item.verb_attributes);
 					break;
 				case 'dial':
 						item.verb_attributes.method = "POST"
