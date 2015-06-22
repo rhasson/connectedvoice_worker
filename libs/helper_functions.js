@@ -143,8 +143,6 @@ module.exports = helpers = {
 
 			tResp = helpers.buildIvrTwiml(actions, params.id, params);
 
-			console.log('ACTION RESP: ', tResp)
-
 			return when.resolve(tResp);
 		})
 		.catch(function(err) {

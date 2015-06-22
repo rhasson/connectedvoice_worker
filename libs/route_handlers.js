@@ -21,6 +21,7 @@ module.exports = handlers = {
 		callActionHandler: function(request, reply, next) {
 			if (checkHost(request.headers.host)) {
 				helpers.callActionResponse(request.params).then(function(resp) {
+					console.log('ACTION RESP: ', resp)
 					reply.setHeader('content-type', 'application/xml');
 					reply.end(resp);
 					return next();
