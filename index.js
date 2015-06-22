@@ -5,6 +5,10 @@ var restify = require('restify'),
 	server.use(restify.queryParser());
 	server.use(restify.gzipResponse());
 	server.use(restify.bodyParser());
+	server.use(function(req, repl, next) {
+		console.log(req.headers, req.url);
+		return next();
+	})
 
 	server.post('/actions/v0/:id/voice.xml', handlers.v0.voiceCallHandler);
 	server.post('/actions/v0/:id/status', handlers.v0.callStatusHandler);
