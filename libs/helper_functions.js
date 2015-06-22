@@ -78,6 +78,7 @@ module.exports = helpers = {
 			//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
 			gather = CACHE[id].gather;
 
+			//check if the index provided in URL is that of a Gather verb
 			if (gather.index === params.index) {
 				//get the actions array based on the pressed ivr digit
 				actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
@@ -85,6 +86,16 @@ module.exports = helpers = {
 				tResp = helpers.buildIvrTwiml(actions, params.id, params);
 
 				return when.resolve(tResp);
+			} else {
+				//index is not that of a Gather verb so it must be of an action
+				//find the requested index inside the nested array pulling out specifically the only action requested
+				actions = _.find(_.result(_.find(gather.nested, {actions: [{index: params.index}]}), 'actions'), {index: params.index});
+				
+				if (actions) {
+					tResp = helpers.buildIvrTwiml(actions, params.id, params);
+
+					return when.resolve(tResp);
+				}
 			}
 		}
 		//entry not in cache, query database, cache entry and respond with twiml
@@ -111,13 +122,28 @@ module.exports = helpers = {
 				//if we can't find the requested gather verb, grab the first one in the IVR
 				gather = _.find(doc.actions, 'verb', 'gather');
 			}
-			console.log('GATHER: ', gather)
-			//cache it for future API calls
-			CACHE[id].gather = gather;
-			//get the actions array based on the pressed ivr digit
-			actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
+			if (gather.verb === 'gather') {
+				//This is a Gather verb
+				//cache it for future API calls
+				CACHE[id].gather = gather;
+				if ('Digits' in params) {
+					//get the actions array based on the pressed ivr digit
+					actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
+				} else {
+					//return the action based on index id if Digits are not available (after the user already pressed a digit)
+					actions = _.find(_.result(_.find(gather.nested, {actions: [{index: params.index}]}), 'actions'), {index: params.index});
+					if (!actions) {
+						actions = gather;
+					}
+				}
+			} else {
+				//this is a top level action
+				actions = gather;
+			}
 
 			tResp = helpers.buildIvrTwiml(actions, params.id, params);
+
+			console.log('ACTION RESP: ', tResp)
 
 			return when.resolve(tResp);
 		})
@@ -160,6 +186,8 @@ module.exports = helpers = {
 	buildIvrTwiml: function(actions, userid, vars) {
 		var rTwiml = TwimlResponse();
 		var params = cleanUp(vars);
+
+		if (!(actions instanceof Array)) actions = [actions];
 
 		for (var i=0; i < actions.length; i++) {
 			create(actions[i], rTwiml);
