@@ -19,11 +19,22 @@ module.exports = handlers = {
 			});
 		},
 		callActionHandler: function(request, reply, next) {
-			helpers.callActionResponse(request.params).then(function(resp) {
-				reply.setHeader('content-type', 'application/xml');
-				reply.end(resp);
+			if (checkHost(request.headers.host)) {
+				helpers.callActionResponse(request.params).then(function(resp) {
+					reply.setHeader('content-type', 'application/xml');
+					reply.end(resp);
+					return next();
+				});
+			} else {
+				console.log('Ilegal host: ', request.headers)
+				reply.send(403);
 				return next();
-			});
+			}
 		}
 	}
+}
+
+function checkHost(host) {
+	if (process.env.NODE_ENV = 'development') return true;
+	return /api.twilio.com/.test(host);
 }
