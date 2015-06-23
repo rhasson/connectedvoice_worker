@@ -238,7 +238,7 @@ module.exports = helpers = {
 					item.verb_attributes.action += '/' + item.index;
 					item.verb_attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
 					tmpl = _.template(item.nouns.body);
-					twiml.message(tmpl(params), item.verb_attributes);
+					twiml.sms(tmpl(params), item.verb_attributes);
 					break;
 			}
 		}
