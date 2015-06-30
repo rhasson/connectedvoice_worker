@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "cloudant": "^1.0.0-beta3",
+    "js-csp": "^0.4.1",
     "lodash": "^3.5.0",
     "restify": "^3.0.1",
     "twilio": "^1.11.1",

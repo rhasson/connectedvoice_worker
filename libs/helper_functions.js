@@ -56,7 +56,7 @@ module.exports = helpers = {
 		var id = new Buffer(params.id, 'base64').toString('utf8');
 		
 		params.id = id;
-		params.type = 'call_status';
+		params.type = ('SmsSid' in params) ? 'sms_status' : 'call_status';
 
 		return dbinsert(params).then(function(doc) {
 			var body = doc.shift();
@@ -171,6 +171,24 @@ module.exports = helpers = {
 		});		
 */		
 	},
+	getIvrForUserId: function(id, to) {
+		if (id) {
+			id = new Buffer(id, 'base64').toString('utf8');
+			console.log('ACCOUNT ID: ', id)
+			return dbget(id).then(function(resp) {
+				var doc = resp.shift();
+				var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: to}), 'ivr_id');
+				console.log('IVR ID: ', ivr_id)
+				
+				if (ivr_id !== undefined) return dbget(ivr_id);
+				else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
+			})
+			.then(function(resp) {
+				var doc = resp.shift();
+				return when.resolve(doc);
+			});
+		}
+	},
 	buildErrorTwiml: function(message) {
 		var rTwiml = TwimlResponse();
 		rTwiml.say(message, {
@@ -179,7 +197,7 @@ module.exports = helpers = {
 			language: 'en'
 		});
 		rTwiml.hangup();
-		return rTwiml.toString();
+		return when.resolve(rTwiml.toString());
 	},
 	buildIvrTwiml: function(actions, userid, vars) {
 		var rTwiml = TwimlResponse();
