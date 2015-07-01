@@ -49,18 +49,14 @@ var restify = require('restify'),
 		var val = yield csp.take(processor.outbound);
 		while (val !== csp.CLOSED) {
 			val.reply.setHeader('content-type', 'application/xml');
-			val.reply.end(val.body || 200);
+			if (val.body instanceof Error) val.reply.send(403, val.body.message);
+			else if (val.body === undefined) val.reply.end(200);
+			else val.reply.end(200, val.body);
 			val.next();
 			val = yield csp.take(processor.outbound);
 		}
 	});
 
-/*
-	server.post('/actions/v0/:id/voice.xml', handlers.v0.voiceCallHandler);
-	server.post('/actions/v0/:id/status', handlers.v0.callStatusHandler);
-	server.post('/actions/v0/:id/action', handlers.v0.callActionHandler);
-	server.post('/actions/v0/:id/action/:index', handlers.v0.callActionHandler);
-*/
 	server.listen(9000, function() {
 		console.log('Started Voice API server - ' + new Date());
 	});
