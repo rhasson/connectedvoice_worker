@@ -1,6 +1,6 @@
 var restify = require('restify'),
 	server = restify.createServer(),
-	processor = require('./lib/processor'),
+	processor = require('./libs/processor'),
 	csp = require('js-csp');
 	//handlers = require('./libs/route_handlers');
 
@@ -36,7 +36,7 @@ var restify = require('restify'),
 		});
 	}
 
-	function postHandlerVoice(request, reply, next) {
+	function postHandlerAction(request, reply, next) {
 		processor.put(processor.inbound, {
 			request: request,
 			reply: reply,
@@ -45,18 +45,20 @@ var restify = require('restify'),
 		});
 	}
 
-	csp.go(function*() {
-		var val = yield csp.take(processor.outbound);
-		while (val !== csp.CLOSED) {
-			val.reply.setHeader('content-type', 'application/xml');
-			if (val.body instanceof Error) val.reply.send(403, val.body.message);
-			else if (val.body === undefined) val.reply.end(200);
-			else val.reply.end(200, val.body);
-			val.next();
-			val = yield csp.take(processor.outbound);
-		}
-	});
-
 	server.listen(9000, function() {
 		console.log('Started Voice API server - ' + new Date());
+		
+		csp.go(function*() {
+			console.log('starting outbound taker')
+			var val = yield csp.take(processor.outbound);
+			while (val !== csp.CLOSED) {
+				val.reply.setHeader('content-type', 'application/xml');
+				if (val.body instanceof Error) val.reply.send(403, val.body.message);
+				else if (val.body === undefined) val.reply.send(200);
+				else val.reply.send(200, val.body);
+				val.reply.end();
+				val.next();
+				val = yield csp.take(processor.outbound);
+			}
+		});
 	});

@@ -75,6 +75,7 @@ function _callStatusResponse(params) {
 	params.id = id;
 	params.type = ('SmsSid' in params) ? 'sms_status' : 'call_status';
 
+/*
 	return dbinsert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
@@ -84,10 +85,14 @@ function _callStatusResponse(params) {
 			return when.resolve(body);
 		}
 	});
+*/
+	console.log('RET: ', params)
+	return when.resolve();
+
 }
 
 function _callActionGatherResponse(params) {
-	console.log('ACTION REQUEST: PARAMS: ', params);
+	console.log('ACTION GATHER REQUEST: PARAMS: ', params);
 	var id = new Buffer(params.id, 'base64').toString('utf8');
 	var tResp, actions, gather;
 
@@ -104,9 +109,6 @@ function _callActionGatherResponse(params) {
 			tResp = _buildIvrTwiml(actions, params.id, params);
 
 			return when.resolve(tResp);
-		} else {
-			console.log('Gather index did not match');
-			return when.reject(new Error('Failed to find Gather'));
 		}
 	}
 	//entry not in cache, query database, cache entry and respond with twiml
@@ -123,7 +125,7 @@ function _callActionGatherResponse(params) {
 	})
 	.then(function(resp) {
 		var doc = resp.shift();
-		var tResp, actions = [], gather;
+		var tResp, actions = [], gather = undefined;
 
 		if (params.index) {
 			//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
@@ -144,6 +146,7 @@ function _callActionGatherResponse(params) {
 		}
 
 		tResp = _buildIvrTwiml(actions, params.id, params);
+		console.log('db done')
 
 		return when.resolve(tResp);
 	})
@@ -179,98 +182,6 @@ function _callActionDialResponse(params) {
 	});
 }
 
-/*
-function _callActionResponse(params) {
-	console.log('ACTION REQUEST: PARAMS: ', params);
-	var id = new Buffer(params.id, 'base64').toString('utf8');
-	var tResp, actions, gather;
-
-	if (CACHE[id]) {
-		//found entry in cache, build and respond with twiml
-		//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
-		gather = CACHE[id].gather;
-
-		//check if the index provided in URL is that of a Gather verb
-		if (gather.index === params.index) {
-			//get the actions array based on the pressed ivr digit
-			actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
-
-			tResp = helpers.buildIvrTwiml(actions, params.id, params);
-
-			return when.resolve(tResp);
-		} else {
-			//index is not that of a Gather verb so it must be of an action
-			//find the requested index inside the nested array pulling out specifically the only action requested
-			actions = _.find(_.result(_.find(gather.nested, {actions: [{index: params.index}]}), 'actions'), {index: params.index});
-			
-			if (actions) {
-				tResp = helpers.buildIvrTwiml(actions, params.id, params);
-
-				return when.resolve(tResp);
-			}
-		}
-	}
-	//entry not in cache, query database, cache entry and respond with twiml
-	return dbget(id).then(function(resp) {
-		var doc = resp.shift();
-		var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: params.To}), 'ivr_id');
-		console.log('IVR ID: ', ivr_id)
-		
-		if (ivr_id !== undefined) {
-			CACHE[id] = {id: ivr_id};
-			return dbget(ivr_id);
-		}
-		else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
-	})
-	.then(function(resp) {
-		var doc = resp.shift();
-		var tResp, actions, gather;
-
-		if (params.index) {
-			//get the gather verb that is responsible for the ivr with the index # provided by the API call from twilio
-			gather = _.find(doc.actions, 'index', params.index);
-		}
-		if (!gather) { 
-			//if we can't find the requested gather verb, grab the first one in the IVR
-			gather = _.find(doc.actions, 'verb', 'gather');
-		}
-		if (gather.verb === 'gather') {
-			//This is a Gather verb
-			//cache it for future API calls
-			CACHE[id].gather = gather;
-			if ('Digits' in params) {
-				//get the actions array based on the pressed ivr digit
-				actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
-			} else {
-				//return the action based on index id if Digits are not available (after the user already pressed a digit)
-				actions = _.find(_.result(_.find(gather.nested, {actions: [{index: params.index}]}), 'actions'), {index: params.index});
-				if (!actions) {
-					actions = gather;
-				}
-			}
-		} else {
-			//this is a top level action
-			actions = gather;
-		}
-
-		tResp = helpers.buildIvrTwiml(actions, params.id, params);
-
-		return when.resolve(tResp);
-	})
-	.catch(function(err) {
-		var msg, tResp;
-		console.log('callActionResponse ERROR: ', err);
-		msg = (err instanceof Error) ? err.message : err
-		tResp = helpers.buildErrorTwiml(msg);
-		return when.resolve(tResp);
-		//return when.reject(new Error('VoiceCallResponse: Failed to get record from DB - '+err));
-	});
-
-
-	//TODO save a db record to track IVR interactions
-}
-*/
-
 function _getIvrForUserId(id, to) {
 	if (id) {
 		id = new Buffer(id, 'base64').toString('utf8');
@@ -298,7 +209,7 @@ function _buildMessageTwiml(message) {
 		language: 'en'
 	});
 	rTwiml.hangup();
-	return when.resolve(rTwiml.toString());
+	return rTwiml.toString();
 }
 
 function _buildIvrTwiml(actions, userid, vars) {
