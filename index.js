@@ -49,7 +49,7 @@ var restify = require('restify'),
 		console.log('Started Voice API server - ' + new Date());
 		
 		csp.go(function*() {
-			console.log('starting outbound taker')
+			console.log('Starting outbound channel loop');
 			var val = yield csp.take(processor.outbound);
 			while (val !== csp.CLOSED) {
 				val.reply.setHeader('content-type', 'application/xml');

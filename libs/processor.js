@@ -71,6 +71,7 @@ sub(publisher, 'call', internal.calls);
 csp.go(function* () {
 	var body;
 	var value = yield take(internal.calls);
+	console.log('Starting inbound call channel loop');
 	while (value !== csp.CLOSED) {
 		body = yield processRequest(value.request.params, value.route_type);
 		if (typeof body === 'string') {
@@ -88,7 +89,7 @@ csp.go(function* () {
 			value.body = undefined;
 			csp.putAsync(outbound, value);
 		}
-		
+
 		value = yield take(internal.calls);
 	}
 });
@@ -99,6 +100,7 @@ sub(publisher, 'status', internal.status);
 csp.go(function* () {
 	var body;
 	var value = yield take(internal.status);
+	console.log('Starting inbound status channel loop');
 	while (value !== csp.CLOSED) {
 		body = yield processRequest(value.request.params, value.route_type);
 		if (typeof body === 'string') {
@@ -127,6 +129,7 @@ sub(publisher, 'action', internal.action);
 csp.go(function* () {
 	var body;
 	var value = yield take(internal.action);
+	console.log('Starting inbound action channel loop');
 	while (value !== csp.CLOSED) {
 		body = yield processRequest(value.request.params, value.route_type);
 		//hack to get around bug in when library that doesn't unwrap nested promises

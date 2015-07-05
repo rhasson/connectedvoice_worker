@@ -146,7 +146,7 @@ function _callActionGatherResponse(params) {
 		}
 
 		tResp = _buildIvrTwiml(actions, params.id, params);
-		console.log('db done')
+		console.log('Gather action - db done')
 
 		return when.resolve(tResp);
 	})
@@ -174,7 +174,6 @@ function _callActionDialResponse(params) {
 	return dbinsert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
-			console.log(body);
 			return when.reject(new Error('Failed to save dial status record to DB'));
 		} else {
 			return when.resolve();
