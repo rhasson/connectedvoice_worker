@@ -52,11 +52,11 @@ var restify = require('restify'),
 			console.log('Starting outbound channel loop');
 			var val = yield csp.take(processor.outbound);
 			while (val !== csp.CLOSED) {
-				val.reply.setHeader('content-type', 'application/xml');
+				val.reply.contentType = 'xml';
 				if (val.body instanceof Error) val.reply.send(403, val.body.message);
 				else if (val.body === undefined) val.reply.send(200);
-				else val.reply.send(200, val.body);
-				val.reply.end();
+				else val.reply.end(val.body);
+				//val.reply.end();
 				val.next();
 				val = yield csp.take(processor.outbound);
 			}

@@ -25,7 +25,7 @@ var processRequest = gen.lift(function*(params, route_type) {
 	//get state object for CallSid
 	var body = undefined;
 	var state = update_state(params.CallSid, params.CallStatus);
-
+	
 	try {
 		switch(route_type) {
 			case 'call':
