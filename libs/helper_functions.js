@@ -75,7 +75,6 @@ function _callStatusResponse(params) {
 	params.id = id;
 	params.type = ('SmsSid' in params) ? 'sms_status' : 'call_status';
 
-/*
 	return dbinsert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
@@ -85,10 +84,8 @@ function _callStatusResponse(params) {
 			return when.resolve(body);
 		}
 	});
-*/
-	console.log('RET: ', params)
-	return when.resolve();
 
+	return when.resolve();
 }
 
 function _callActionGatherResponse(params) {
