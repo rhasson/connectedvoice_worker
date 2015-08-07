@@ -3,6 +3,7 @@ var _ = require('lodash'),
 	when = require('when'),
 	whennode = require('when/node'),
 	gen = require('when/generator'),
+	request = require('request'),
 	TwimlResponse = require('twilio').TwimlResponse,
 	twilio = require('twilio')(config.twilio.production.account_sid, config.twilio.production.auth_token),
 	cloudant = require('cloudant')({
@@ -15,7 +16,8 @@ var _ = require('lodash'),
 var dbinsert = whennode.lift(db.insert),
 	dbsearch = whennode.lift(db.search),
 	dbget = whennode.lift(db.get),
-	dbremove = whennode.lift(db.destroy);
+	dbremove = whennode.lift(db.destroy),
+	http = whennode.lift(request);
 
 var CACHE = [];
 
@@ -59,7 +61,8 @@ function _voiceCallResponse(params) {
 		.then(function(resp) {
 			var doc = resp.shift();
 			var tResp = _buildIvrTwiml(doc.actions, params.id, params);
-			return when.resolve(tResp);
+			if (typeof tResp === 'object') return webtaskRunApi(tResp);
+			else return when.resolve(tResp);
 		})
 		.catch(function(err) {
 			console.log('voiceCallResponse ERROR: ', err);
@@ -105,7 +108,8 @@ function _callActionGatherResponse(params) {
 
 			tResp = _buildIvrTwiml(actions, params.id, params);
 
-			return when.resolve(tResp);
+			if (typeof tResp === 'object') return webtaskRunApi(tResp);
+			else return when.resolve(tResp);
 		}
 	}
 	//entry not in cache, query database, cache entry and respond with twiml
@@ -145,7 +149,8 @@ function _callActionGatherResponse(params) {
 		tResp = _buildIvrTwiml(actions, params.id, params);
 		console.log('Gather action - db done')
 
-		return when.resolve(tResp);
+		if (typeof tResp === 'object') return webtaskRunApi(tResp);
+		else return when.resolve(tResp);
 	})
 	.catch(function(err) {
 		var msg, tResp;
@@ -210,9 +215,25 @@ function _buildMessageTwiml(message) {
 
 function _buildIvrTwiml(actions, userid, vars) {
 	var rTwiml = TwimlResponse();
+	var datetime = new Date()
 	var params = cleanUp(vars);
+	var task;
 
 	if (!(actions instanceof Array)) actions = [actions];
+
+	task = extractWebtaskTasks(actions);
+
+	if (task) {
+		//right now only allow one webtask and no other twiml actions
+		task.to = vars.To;
+		task.from = vars.From;
+		task.callSid = vars.CallSid;
+		task.callStatus = vars.CallStatus;
+		task.time = datetime.toTimeString();
+		task.date = datetime.toDateString();
+
+		return task;
+	}
 
 	for (var i=0; i < actions.length; i++) {
 		create(actions[i], rTwiml);
@@ -271,7 +292,6 @@ function _buildIvrTwiml(actions, userid, vars) {
 	}
 
 	function cleanUp(p) {
-		var datetime = new Date();
 		return obj = {
 			caller: p.Caller,
 			callee: p.Called,
@@ -280,7 +300,60 @@ function _buildIvrTwiml(actions, userid, vars) {
 			time: datetime.toTimeString(),
 			date: datetime.toDateString()
 		};
-
 	}
+
 	return rTwiml.toString();
+}
+
+function webtaskRunApi(task) {
+	
+	/** TODO: fix to invoke the run api with added callback urls as data **/
+
+	return http({
+		url: config.webtask.run 
+			+ '/' + config.webtask.container
+			+ '?key=' + config.webtask.key,
+		method: 'GET',
+		qs: task,
+		encoding: 'application/xml'
+	}).then(function(resp) {
+		var headers = resp.shift();
+		var body = resp.shift();
+		if (headers.statusCode === 200) {
+			return when.resolve(body);
+		} else {
+			console.log('Webtask failed: ', headers.statusCode, ' = ', body);
+			return when.reject(new Error('Failed to get response from webtask'));
+		}
+	}).catch(function(err) {
+		console.log('Webtask run error: ', err);
+		return when.reject(new Error('An error in the webtask was encountered'));
+	});
+}
+
+function extractWebtaskTasks(arr) {
+	return _.find(arr, {verb: 'webtask'});  //returns the first webtask action it finds or undefined
+
+/*
+	var tasks = {
+		toplovel: [],
+		bottomlevel: []
+	};
+	var child;
+	for (var i=0; i < arr.length; i++) {
+		if (arr[i].verb === 'webtask') tasks.toplevel.push({index: arr[i].index, token: arr[i].webtask_token});
+		else if (arr[i].verb === 'gather') {
+			scan(arr[i].nested)
+		}
+	}
+
+	function scan(nested) {
+		for (var j=0; j < nested.length; j++) {
+			child = _.find(nested[j].actions, 'verb', 'webtask')
+			console.log('EXTRACT - CHILD: ', child)
+			if (child) tasks.bottomlevel.push({index: child.index, token: child.webtask_token})
+		}
+	};
+	return tasks;
+*/
 }
