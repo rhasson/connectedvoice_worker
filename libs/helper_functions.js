@@ -94,7 +94,7 @@ function _callStatusResponse(params) {
 function _callActionGatherResponse(params) {
 	console.log('ACTION GATHER REQUEST: PARAMS: ', params);
 	var id = new Buffer(params.id, 'base64').toString('utf8');
-	var tResp, actions, gather;
+	var tResp, action, gather;
 
 	if (CACHE[id]) {
 		//found entry in cache, build and respond with twiml
@@ -104,12 +104,13 @@ function _callActionGatherResponse(params) {
 		//check if the index provided in URL is that of a Gather verb
 		if (gather.index === params.index) {
 			//get the actions array based on the pressed ivr digit
-			actions = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions');
+			action = _.result(_.find(gather.nested, {nouns: {expected_digit: params.Digits}}), 'actions')[0];
 
-			tResp = _buildIvrTwiml(actions, params.id, params);
-
-			if (typeof tResp === 'object') return webtaskRunApi(tResp);
-			else return when.resolve(tResp);
+			if (action && 'webtask_token' in action && action.webtask_token) return webtaskRunApi(action);
+			else {
+				tResp = _buildIvrTwiml(action, params.id, params);
+				return when.resolve(tResp);
+			}
 		}
 	}
 	//entry not in cache, query database, cache entry and respond with twiml
@@ -146,14 +147,14 @@ function _callActionGatherResponse(params) {
 			}
 		}
 
-		tResp = _buildIvrTwiml(actions, params.id, params);
+		tResp = _buildIvrTwiml(actions, params.id, params);  //*** FIX ME: for some reason the data in tResp is cached as gather.nested.actions
 		console.log('Gather action - db done')
 
 		if (typeof tResp === 'object') return webtaskRunApi(tResp);
 		else return when.resolve(tResp);
 	})
 	.catch(function(err) {
-		var msg, tResp;
+		var msg;
 		console.log('callActionResponse ERROR: ', err);
 		return when.reject(new Error('callActionGatherResponse error - '+err));
 	});
@@ -223,7 +224,7 @@ function _buildIvrTwiml(actions, userid, vars) {
 
 	task = extractWebtaskTasks(actions);
 
-	console.log('EXTRACTED: ', task)
+	//console.log('EXTRACTED: ', task)
 
 	if (task) {
 		//right now only allow one webtask and no other twiml actions
@@ -302,8 +303,8 @@ function _buildIvrTwiml(actions, userid, vars) {
 			callee: p.Called,
 			digits: p.Digits,
 			datetime: datetime,
-			time: datetime.toTimeString()
-,			date: datetime.toDateString()
+			time: datetime.toTimeString(),
+			date: datetime.toDateString()
 		};
 	}
 
@@ -311,8 +312,11 @@ function _buildIvrTwiml(actions, userid, vars) {
 }
 
 function webtaskRunApi(task) {
-	var token = task.webtask_token;
-console.log('TASK: ', task);
+	var token;
+	if (task instanceof Array) task = task[0];
+	token = task.webtask_token;
+
+//console.log('TASK: ', task);
 	//delete task.webtask_token;
 
 console.log('CALL WEBTASK')
