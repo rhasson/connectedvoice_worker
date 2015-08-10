@@ -223,6 +223,8 @@ function _buildIvrTwiml(actions, userid, vars) {
 
 	task = extractWebtaskTasks(actions);
 
+	console.log('EXTRACTED: ', task)
+
 	if (task) {
 		//right now only allow one webtask and no other twiml actions
 		task.to = vars.To;
@@ -231,6 +233,9 @@ function _buildIvrTwiml(actions, userid, vars) {
 		task.callStatus = vars.CallStatus;
 		task.time = datetime.toTimeString();
 		task.date = datetime.toDateString();
+		delete task.verb;
+		delete task.nouns;
+		delete task.action_for;
 
 		return task;
 	}
@@ -297,8 +302,8 @@ function _buildIvrTwiml(actions, userid, vars) {
 			callee: p.Called,
 			digits: p.Digits,
 			datetime: datetime,
-			time: datetime.toTimeString(),
-			date: datetime.toDateString()
+			time: datetime.toTimeString()
+,			date: datetime.toDateString()
 		};
 	}
 
@@ -306,19 +311,24 @@ function _buildIvrTwiml(actions, userid, vars) {
 }
 
 function webtaskRunApi(task) {
-	
-	/** TODO: fix to invoke the run api with added callback urls as data **/
+	var token = task.webtask_token;
+console.log('TASK: ', task);
+	//delete task.webtask_token;
 
+console.log('CALL WEBTASK')
 	return http({
 		url: config.webtask.run 
 			+ '/' + config.webtask.container
-			+ '?key=' + config.webtask.key,
-		method: 'GET',
-		qs: task,
-		encoding: 'application/xml'
+			+ '?key=' + token,
+		method: 'POST',
+		json: true,
+		body: task
 	}).then(function(resp) {
 		var headers = resp.shift();
 		var body = resp.shift();
+
+		//console.log('HEADERS: ', headers)
+		console.log('BODY: ', body)
 		if (headers.statusCode === 200) {
 			return when.resolve(body);
 		} else {
