@@ -204,7 +204,7 @@ function _getIvrForUserId(id, to) {
 }
 
 function _buildMessageTwiml(message) {
-	var rTwiml = TwimlResponse();
+	var rTwiml;
 	rTwiml.say(message, {
 		voice: 'Woman',
 		loop: 1,
@@ -214,11 +214,13 @@ function _buildMessageTwiml(message) {
 	return rTwiml.toString();
 }
 
-function _buildIvrTwiml(actions, userid, vars) {
+function _buildIvrTwiml(acts, userid, vars) {
 	var rTwiml = TwimlResponse();
 	var datetime = new Date()
 	var params = cleanUp(vars);
 	var task;
+	var actions = _.cloneDeep(acts);
+
 
 	if (!(actions instanceof Array)) actions = [actions];
 
