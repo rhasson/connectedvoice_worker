@@ -13,6 +13,7 @@ var inbound = csp.chan(10),
 	outbound = csp.chan(10),
 	internal = {
 		calls: csp.chan(10),
+		sms: csp.chan(10),
 		status: csp.chan(10),
 		action: csp.chan(10)
 	};
@@ -31,6 +32,10 @@ var processRequest = gen.lift(function*(params, route_type) {
 			case 'call':
 				if (!state.closed) body = yield helper.voiceCallResponse(params);
 				else body = yield helper.buildMessageTwiml('Failed to complete your call.  Goodbye');
+				break;
+			case 'sms':
+				if (!state.closed) body = yield helper.smsResponse(params);
+				else body = yield helper.buildMessageTwiml('Failed to complete your sms request.  Goodbye');
 				break;
 			case 'status':
 				yield helper.callStatusResponse(params);
@@ -91,6 +96,35 @@ csp.go(function* () {
 		}
 
 		value = yield take(internal.calls);
+	}
+});
+
+//CSP loop to to process sms/mms events
+//Setup a subscriber to the 'sms' type and feed it into sms_channel
+sub(publisher, 'sms', internal.sms);
+csp.go(function* () {
+	var body;
+	var value = yield take(internal.sms);
+	console.log('Starting inbound sms channel loop');
+	while (value !== csp.CLOSED) {
+		body = yield processRequest(value.request.params, value.route_type);
+		if (typeof body === 'string') {
+			value.body = body;
+	 		csp.putAsync(outbound, value);
+		} else if (typeof body === 'object') {
+			body.then(function(resp){
+				console.log('GOOD: ', resp)
+				value.body = resp;
+		 		csp.putAsync(outbound, value);
+			}).catch(function() {
+				console.log('BAD')
+			});
+		} else {
+			value.body = undefined;
+			csp.putAsync(outbound, value);
+		}
+
+		value = yield take(internal.sms);
 	}
 });
 

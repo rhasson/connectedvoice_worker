@@ -14,6 +14,7 @@ var restify = require('restify'),
 	});
 
 	server.post('/actions/v0/:id/voice.xml', postHandlerVoice);
+	server.post('/actions/v0/:id/sms.xml', postHandlerSms);
 	server.post('/actions/v0/:id/status', postHandlerStatus);
 	server.post('/actions/v0/:id/action', postHandlerAction);
 	server.post('/actions/v0/:id/action/:index', postHandlerAction);
@@ -24,6 +25,15 @@ var restify = require('restify'),
 			reply: reply,
 			next: next,
 			route_type: 'call'
+		});
+	}
+
+	function postHandlerSms(request, reply, next) {
+		processor.put(processor.inbound, {
+			request: request,
+			reply: reply,
+			next: next,
+			route_type: 'sms'
 		});
 	}
 

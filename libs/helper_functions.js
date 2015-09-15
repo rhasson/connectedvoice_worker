@@ -27,6 +27,9 @@ module.exports = {
 	voiceCallResponse: gen.lift(function*(params) {
 		return yield _voiceCallResponse(params);
 	}),
+	smsResponse: gen.lift(function*(params) {
+		return yield _smsResponse(params);
+	}),
 	callStatusResponse: gen.lift(function*(params) {
 		return yield _callStatusResponse(params);
 	}),
@@ -69,6 +72,34 @@ function _voiceCallResponse(params) {
 			return when.reject(new Error('voiceCallResponse error - failed to get record from DB'));
 		});
 	}
+}
+
+function _smsResponse(params) {
+	var id;
+/** TODO: implement SMS TWIML reponse
+	if (params.id) {
+		id = new Buffer(params.id, 'base64').toString('utf8');
+		console.log('ACCOUNT ID: ', id)
+		return dbget(id).then(function(resp) {
+			var doc = resp.shift();
+			var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: params.To}), 'ivr_id');
+			console.log('IVR ID: ', ivr_id)
+			
+			if (ivr_id !== undefined) return dbget(ivr_id);
+			else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
+		})
+		.then(function(resp) {
+			var doc = resp.shift();
+			var tResp = _buildIvrTwiml(doc.actions, params.id, params);
+			if (typeof tResp === 'object') return webtaskRunApi(tResp);
+			else return when.resolve(tResp);
+		})
+		.catch(function(err) {
+			console.log('voiceCallResponse ERROR: ', err);
+			return when.reject(new Error('voiceCallResponse error - failed to get record from DB'));
+		});
+	}
+*/
 }
 
 function _callStatusResponse(params) {
@@ -147,7 +178,7 @@ function _callActionGatherResponse(params) {
 			}
 		}
 
-		tResp = _buildIvrTwiml(actions, params.id, params);  //*** FIX ME: for some reason the data in tResp is cached as gather.nested.actions
+		tResp = _buildIvrTwiml(actions, params.id, params); 
 		console.log('Gather action - db done')
 
 		if (typeof tResp === 'object') return webtaskRunApi(tResp);
