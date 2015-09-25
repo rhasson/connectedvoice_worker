@@ -20,12 +20,12 @@ var inbound = csp.chan(10),
 
 //array of state objects keyed by sid
 //{current: string, previous: string, closed: boolean}
-var STATE = [];
+var STATE = [];  //memory leak as this variable will keep growing over time and number of calls
 
 var processRequest = gen.lift(function*(params, route_type) {
 	//get state object for CallSid
 	var body = undefined;
-	var state = update_state(params.CallSid, params.CallStatus);
+	var state = update_state(params.CallSid, params.CallStatus);  //TODO: this is a memory leaky problem. need to fix
 	
 	try {
 		switch(route_type) {
@@ -56,7 +56,7 @@ var processRequest = gen.lift(function*(params, route_type) {
 		console.log('returning body')
 		return body;
 	} catch(e) {
-		console.log('Error processing twiml request - ', e);
+		console.log('Error processing twiml request - ', e.stack);
 		body = yield helper.buildMessageTwiml('An error was encountered, terminating session.  Goodbye');
 		console.log('returning body error')
 		return body;

@@ -4,6 +4,7 @@ var _ = require('lodash'),
 	whennode = require('when/node'),
 	gen = require('when/generator'),
 	request = require('request'),
+	TwimlParser = require('./twiml_parser'),
 	TwimlResponse = require('twilio').TwimlResponse,
 	twilio = require('twilio')(config.twilio.production.account_sid, config.twilio.production.auth_token),
 	cloudant = require('cloudant')({
@@ -187,7 +188,7 @@ function _callActionGatherResponse(params) {
 	.catch(function(err) {
 		var msg;
 		console.log('callActionResponse ERROR: ', err);
-		return when.reject(new Error('callActionGatherResponse error - '+err));
+		return when.reject(new Error('callActionGatherResponse error - '+err.stack));
 	});
 }
 
@@ -235,7 +236,7 @@ function _getIvrForUserId(id, to) {
 }
 
 function _buildMessageTwiml(message) {
-	var rTwiml;
+	var rTwiml = TwimlResponse();
 	rTwiml.say(message, {
 		voice: 'Woman',
 		loop: 1,
@@ -246,7 +247,8 @@ function _buildMessageTwiml(message) {
 }
 
 function _buildIvrTwiml(acts, userid, vars) {
-	var rTwiml = TwimlResponse();
+	var rTwiml;// = TwimlResponse();
+	var parser = new TwimlParser();
 	var datetime = new Date()
 	var params = cleanUp(vars);
 	var task;
@@ -274,61 +276,12 @@ function _buildIvrTwiml(acts, userid, vars) {
 		return task;
 	}
 
+	rTwiml = parser.create(actions).buildTwiml(TwimlResponse(), params, userid);
+/*	
 	for (var i=0; i < actions.length; i++) {
 		create(actions[i], rTwiml);
 	}
-
-	function create(item, twiml) {
-		var tmpl = undefined;
-		switch (item.verb) {
-			case 'say':
-				tmpl = _.template(item.nouns.text);
-				twiml.say(tmpl(params), item.verb_attributes);
-				break;
-			case 'dial':
-					item.verb_attributes.method = "POST"
-					item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-					item.verb_attributes.action += '/' + item.index;
-				twiml.dial(item.verb_attributes, function(node) {
-					if ('number' in item.nouns) {
-						for (var j=0; j < item.nouns.number.length; j++) {
-							node.number(item.nouns.number[j]);	
-						}
-					} else node.text = item.nouns.text;
-				});
-				break;
-			case 'hangup':
-				twiml.hangup();
-				break;
-			case 'gather':
-				console.log('ITEM: ', item)
-				item.verb_attributes.method = "POST";
-				item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-				item.verb_attributes.action += '/' + item.index;
-				twiml.gather(item.verb_attributes, function(node) {
-					if ('nested' in item && item.nested.length) {
-						for (var j=0; j < item.nested.length; j++) {
-							create(item.nested[j], node);
-						}
-					}
-				});
-				break;
-			case 'pause':
-				twiml.pause(item.verb_attributes);
-				break;
-			case 'reject':
-				twiml.pause(item.verb_attributes);
-				break;
-			case 'message':
-				item.verb_attributes.method = 'POST';
-				item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-				item.verb_attributes.action += '/' + item.index;
-				item.verb_attributes.statusCallback = config.callbacks.StatusCallback.replace('%userid', userid);
-				tmpl = _.template(item.nouns.body);
-				twiml.sms(tmpl(params), item.verb_attributes);
-				break;
-		}
-	}
+*/
 
 	function cleanUp(p) {
 		return obj = {
@@ -380,27 +333,4 @@ console.log('CALL WEBTASK')
 
 function extractWebtaskTasks(arr) {
 	return _.find(arr, {verb: 'webtask'});  //returns the first webtask action it finds or undefined
-
-/*
-	var tasks = {
-		toplovel: [],
-		bottomlevel: []
-	};
-	var child;
-	for (var i=0; i < arr.length; i++) {
-		if (arr[i].verb === 'webtask') tasks.toplevel.push({index: arr[i].index, token: arr[i].webtask_token});
-		else if (arr[i].verb === 'gather') {
-			scan(arr[i].nested)
-		}
-	}
-
-	function scan(nested) {
-		for (var j=0; j < nested.length; j++) {
-			child = _.find(nested[j].actions, 'verb', 'webtask')
-			console.log('EXTRACT - CHILD: ', child)
-			if (child) tasks.bottomlevel.push({index: child.index, token: child.webtask_token})
-		}
-	};
-	return tasks;
-*/
 }
