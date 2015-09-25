@@ -277,11 +277,6 @@ function _buildIvrTwiml(acts, userid, vars) {
 	}
 
 	rTwiml = parser.create(actions).buildTwiml(TwimlResponse(), params, userid);
-/*	
-	for (var i=0; i < actions.length; i++) {
-		create(actions[i], rTwiml);
-	}
-*/
 
 	function cleanUp(p) {
 		return obj = {
