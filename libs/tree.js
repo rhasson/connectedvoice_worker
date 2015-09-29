@@ -68,18 +68,19 @@ class Tree {
     //add a node to an existing branch
     let root = this.tree.get(this.rootId);
 
-    let check = (branch, id) => {
-      if (branch.hasNode(id)) {
+    let check = (id, branch) => {
+      //console.log('BRANCH: ', branch)
+      if (id === branch.content[this.idKey]) {
+        branch.addNode(node[this.idKey], new Node(node));
+      } else if (branch.hasNode(id)) {
         branch.appendNodeTo(id, node[this.idKey], new Node(node));
-        return true;
       } else {
         let nodes = branch.getAllNodes()
         if (nodes.length > 0) nodes.forEach( (n) => check(n, id) );
-        else return false;
       }
     }
 
-    check(root, id);
+    check(id, root);
   }
 
   findById(id) {
