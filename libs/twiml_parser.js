@@ -60,6 +60,7 @@ class Parser {
     let tree = new Tree(this.idKey);
 
       for (var i of list) {
+//console.log('ITEM: ', i);
         let item = i.content;
         if (i.prev === undefined && !('parent_id' in item) /* && !('action_for' in item) */) {
           tree.setRoot(item);
@@ -88,6 +89,7 @@ class Parser {
     function create(twiml, node) {
       let tmpl = undefined;
       let item = node.node;
+      console.log('NODE: ', node)
       try {
         switch (item.verb) {
           case 'say':
@@ -99,12 +101,29 @@ class Parser {
             item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
             item.verb_attributes.action += '/' + item.index;
             twiml.dial(item.verb_attributes, function(child) {
-              if ('number' in item.nouns) {
+              if (node.children > 0) {
+                obj = it.next();
+                create(child, obj.value);
+              } else if ('number' in item.nouns) {
                 for (var j=0; j < item.nouns.number.length; j++) {
                   child.number(item.nouns.number[j]);  
                 }
               } else child.text = item.nouns.text;
             });
+            break;
+          case 'group': 
+            if ('number' in twiml && typeof twiml.number === 'function') {
+              try {
+                let temp = JSON.parse(item.nouns.text);
+                if (temp.length > 10) temp = temp.slice(0,10);  //API only allows 10 numbers per DIAL verb
+                temp = _.sortBy(temp, 'priority');
+                for (let i of temp) {
+                  twiml.number(i.phone_number);
+                }
+              } catch(e) {
+                break;
+              }
+            }
             break;
           case 'hangup':
             twiml.hangup();
