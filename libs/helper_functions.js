@@ -61,6 +61,7 @@ function _voiceCallResponse(params) {
 	if (params.id) {
 		id = new Buffer(params.id, 'base64').toString('utf8');
 		console.log('ACCOUNT ID: ', id)
+		console.log('ACTION VOICE REQUEST: PARAMS: ', params);
 
 		return dbget(id).then(function(resp) {
 			var doc = resp.shift();
@@ -259,7 +260,7 @@ function _queueWaitResponse(params) {
 	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly");
 	twiml.pause(10);
 	
-	return rTwiml.toString();	
+	return twiml.toString();	
 }
 
 /****************************************************************************************************/
