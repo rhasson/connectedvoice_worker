@@ -55,7 +55,7 @@ var processRequest = gen.lift(function*(params, route_type) {
 				body = yield helper.callDequeueReponse(params);
 				break;
 			case 'wait':
-				body = yield helper.QueueWaitReponse(params);
+				body = yield helper.queueWaitReponse(params);
 				break;
 			default:
 				body = undefined;
