@@ -256,7 +256,7 @@ function _queueWaitResponse(params) {
 	var twiml = TwimlResponse();
 	var curr;
 
-	twiml.say("You are caller " + params.QueuePosition ". You will be connected shortly");
+	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly");
 	twiml.pause(10);
 	
 	return rTwiml.toString();	
