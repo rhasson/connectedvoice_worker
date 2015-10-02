@@ -258,7 +258,7 @@ function _queueWaitResponse(params) {
 	var curr;
 
 	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly");
-	twiml.pause(10);
+	twiml.pause({length:10});
 	
 	return twiml.toString();	
 }
