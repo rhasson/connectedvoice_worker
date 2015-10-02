@@ -18,7 +18,7 @@ var restify = require('restify'),
 	server.post('/actions/v0/:id/status', postHandlerStatus);
 	server.post('/actions/v0/:id/action', postHandlerAction);
 	server.post('/actions/v0/:id/action/:index', postHandlerAction);
-	server.post('/actions/v0/:id/dequeue/:index', postHandlerDequeue);
+	server.post('/actions/v0/:id/dequeue', postHandlerDequeue);
 	server.post('/actions/v0/:id/wait', postHandlerWait);
 
 	function postHandlerVoice(request, reply, next) {
