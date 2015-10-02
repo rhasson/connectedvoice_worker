@@ -102,7 +102,7 @@ class Parser {
             if (node.children > 0) {
               let o = {
                 method: "POST",
-                action: config.callbacks.DequeueUrl.replace('%userid', userid) + '/' + item.index,
+                action: config.callbacks.DequeueUrl.replace('%userid', userid),
                 waitUrl: config.callbacks.WaitUrl.replace('%userid', userid),
                 waitUrlMethod: "POST"
               }
