@@ -21,6 +21,7 @@ var dbinsert = whennode.lift(db.insert),
 	http = whennode.lift(request);
 
 var CACHE = [];
+var QUEUES = [];
 
 _.templateSettings.interpolate = /{([\s\S]+?)}/g;
 
@@ -43,6 +44,12 @@ module.exports = {
 	callActionDialResponse: gen.lift(function*(params) {
 		return yield _callActionDialResponse(params);
 	}),
+	callDequeueReponse: gen.lift(function*(params) {
+		return yield _callDequeueResponse(params);
+	}),
+	queueWaitReponse: gen.lift(function*(params) {
+		return yield _queueWaitResponse(params);
+	}),
 	buildMessageTwiml: gen.lift(function*(params) {
 		return yield _buildMessageTwiml(params);
 	})
@@ -54,6 +61,7 @@ function _voiceCallResponse(params) {
 	if (params.id) {
 		id = new Buffer(params.id, 'base64').toString('utf8');
 		console.log('ACCOUNT ID: ', id)
+
 		return dbget(id).then(function(resp) {
 			var doc = resp.shift();
 			var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: params.To}), 'ivr_id');
@@ -64,9 +72,14 @@ function _voiceCallResponse(params) {
 		})
 		.then(function(resp) {
 			var doc = resp.shift();
-			var tResp = _buildIvrTwiml(doc.actions, params.id, params);
-			if (typeof tResp === 'object') return webtaskRunApi(tResp);
-			else return when.resolve(tResp);
+			var tResp;
+			if (params.CallStatus === 'queued') {
+				//
+			} else {
+				tResp = _buildIvrTwiml(doc.actions, params.id, params);
+				if (typeof tResp === 'object') return webtaskRunApi(tResp);
+				else return when.resolve(tResp);
+			}
 		})
 		.catch(function(err) {
 			console.log('voiceCallResponse ERROR: ', err);
@@ -215,6 +228,41 @@ function _callActionDialResponse(params) {
 		}
 	});
 }
+
+function _callDequeueResponse(params) {
+	console.log('ACTION DEQUEUE REQUEST: PARAMS: ', params);
+	var id = new Buffer(params.id, 'base64').toString('utf8');
+	//var qsid = QUEUES[id] || params.QueueSid;
+	//if (qsid !== undefined && qsid !== params.QueueSid) return when.reject(new Error('Mismatched queues'));
+	//if (qsid === undefined) return when.reject(new Error('Queue not found'));
+
+	params.id = id;
+	params.type = 'dequeue_status';
+
+	return dbinsert(params).then(function(doc) {
+		var body = doc.shift();
+		if (!('ok' in body) || !body.ok) {
+			return when.reject(new Error('Failed to save dequeue status record to DB'));
+		} else {
+			return when.resolve();
+		}
+	});
+
+}
+
+function _queueWaitResponse(params) {
+	console.log('QUEUE WAIT REQUEST: PARAMS: ', params);
+	var id = new Buffer(params.id, 'base64').toString('utf8');
+	var twiml = TwimlResponse();
+	var curr;
+
+	twiml.say("You are caller " + params.QueuePosition ". You will be connected shortly");
+	twiml.pause(10);
+	
+	return rTwiml.toString();	
+}
+
+/****************************************************************************************************/
 
 function _getIvrForUserId(id, to) {
 	if (id) {

@@ -15,7 +15,9 @@ var inbound = csp.chan(10),
 		calls: csp.chan(10),
 		sms: csp.chan(10),
 		status: csp.chan(10),
-		action: csp.chan(10)
+		action: csp.chan(10),
+		dequeue: csp.chan(10),
+		wait: csp.chan(10)
 	};
 
 //array of state objects keyed by sid
@@ -48,6 +50,12 @@ var processRequest = gen.lift(function*(params, route_type) {
 					else if ('DialCallSid' in params) body = yield helper.callActionDialResponse(params);
 					else body = undefined;
 				} else body = yield helper.buildMessageTwiml('The call has already ended.  Goodbye');
+				break;
+			case 'dequeue':
+				body = yield helper.callDequeueReponse(params);
+				break;
+			case 'wait':
+				body = yield helper.QueueWaitReponse(params);
 				break;
 			default:
 				body = undefined;
@@ -187,6 +195,65 @@ csp.go(function* () {
 	}
 });
 
+//CSP loop to to process queue events
+//Setup a subscriber to the 'dequeue' type and feed it into action_channel
+sub(publisher, 'dequeue', internal.action);
+csp.go(function* () {
+	var body;
+	var value = yield take(internal.action);
+	console.log('Starting inbound dequeue channel loop');
+	while (value !== csp.CLOSED) {
+		body = yield processRequest(value.request.params, value.route_type);
+		//hack to get around bug in when library that doesn't unwrap nested promises
+		if (typeof body === 'string') {
+			value.body = body;
+	 		csp.putAsync(outbound, value);
+		} else if (typeof body === 'object') {
+			body.then(function(resp){
+				console.log('GOOD: ', resp)
+				value.body = resp;
+		 		csp.putAsync(outbound, value);
+			}).catch(function(e) {
+				console.log('BAD: ', e)
+			});
+		} else {
+			value.body = undefined;
+			csp.putAsync(outbound, value);
+		}
+
+		value = yield take(internal.action);
+	}
+});
+
+//CSP loop to to process wait events
+//Setup a subscriber to the 'wait' type and feed it into action_channel
+sub(publisher, 'wait', internal.action);
+csp.go(function* () {
+	var body;
+	var value = yield take(internal.action);
+	console.log('Starting inbound wait channel loop');
+	while (value !== csp.CLOSED) {
+		body = yield processRequest(value.request.params, value.route_type);
+		//hack to get around bug in when library that doesn't unwrap nested promises
+		if (typeof body === 'string') {
+			value.body = body;
+	 		csp.putAsync(outbound, value);
+		} else if (typeof body === 'object') {
+			body.then(function(resp){
+				console.log('GOOD: ', resp)
+				value.body = resp;
+		 		csp.putAsync(outbound, value);
+			}).catch(function(e) {
+				console.log('BAD: ', e)
+			});
+		} else {
+			value.body = undefined;
+			csp.putAsync(outbound, value);
+		}
+
+		value = yield take(internal.action);
+	}
+});
 
 //check if sid exists in global state object
 //return state object for the sid

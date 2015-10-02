@@ -4,7 +4,6 @@ var _ = require('lodash');
 var config = require('../config.json');
 var Tree = require('./tree.js');
 
-
 class Parser {
   /* id_key: {string} name of key in parsed object to be used as an ID.
   * ID will be used as key in the Tree to lookup ivr elements
@@ -14,6 +13,7 @@ class Parser {
     this.list = [];
     this.tree;
     this.idKey = id_key || 'index';
+    this.DEFAULT_QUEUE_NAME = 'incoming';
   }
 
   create(records) {
@@ -77,6 +77,7 @@ class Parser {
   }
 
   buildTwiml(twimlResponse, params, userid) {
+    let self = this;
     if (!('legalNodes' in twimlResponse) || !('say' in twimlResponse)) return new Error ('Not a valid TwiML object');
     let it = this.tree.flatWalk();
     let obj = it.next();
@@ -97,19 +98,30 @@ class Parser {
             twiml.say(tmpl(params), item.verb_attributes);
             break;
           case 'dial':
-            item.verb_attributes.method = "POST"
-            item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid);
-            item.verb_attributes.action += '/' + item.index;
-            twiml.dial(item.verb_attributes, function(child) {
-              if (node.children > 0) {
-                obj = it.next();
-                create(child, obj.value);
-              } else if ('number' in item.nouns) {
-                for (var j=0; j < item.nouns.number.length; j++) {
-                  child.number(item.nouns.number[j]);  
-                }
-              } else child.text = item.nouns.text;
-            });
+            //child nodes on a dial verb means a hunting group was expected
+            if (node.children > 0) {
+              let o = {
+                method: "POST",
+                action: config.callbacks.DequeueUrl.replace('%userid', userid) + '/' + item.index,
+                waitUrl: config.callbacks.WaitUrl.replace('%userid', userid),
+                waitUrlMethod: "POST"
+              }
+              twiml.enqueue(o, self.DEFAULT_QUEUE_NAME);  //setup a queue with the default name to hold new callers
+            } else {
+              item.verb_attributes.method = "POST"
+              item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid) + '/' + item.index;
+              twiml.dial(item.verb_attributes, function(child) {
+             /*   if (node.children > 0) {
+                  obj = it.next();
+                  create(child, obj.value);
+                } else */
+                if ('number' in item.nouns) {
+                  for (var j=0; j < item.nouns.number.length; j++) {
+                    child.number(item.nouns.number[j]);  
+                  }
+                } else child.text = item.nouns.text;
+              });
+            }
             break;
           case 'group': 
             if ('number' in twiml && typeof twiml.number === 'function') {

@@ -18,6 +18,8 @@ var restify = require('restify'),
 	server.post('/actions/v0/:id/status', postHandlerStatus);
 	server.post('/actions/v0/:id/action', postHandlerAction);
 	server.post('/actions/v0/:id/action/:index', postHandlerAction);
+	server.post('/actions/v0/:id/dequeue/:index', postHandlerDequeue);
+	server.post('/actions/v0/:id/wait', postHandlerWait);
 
 	function postHandlerVoice(request, reply, next) {
 		processor.put(processor.inbound, {
@@ -55,6 +57,24 @@ var restify = require('restify'),
 		});
 	}
 
+	function postHandlerDequeue(request, reply, next) {
+		processor.put(processor.inbound, {
+			request: request,
+			reply: reply,
+			next: next,
+			route_type: 'dequeue'
+		});
+	}
+
+	function postHandlerWait(request, reply, next) {
+		processor.put(processor.inbound, {
+			request: request,
+			reply: reply,
+			next: next,
+			route_type: 'wait'
+		});
+	}
+
 	server.listen(9000, function() {
 		console.log('Started Voice API server - ' + new Date());
 		
@@ -66,7 +86,6 @@ var restify = require('restify'),
 				if (val.body instanceof Error) val.reply.send(403, val.body.message, {'content-type': 'application/xml'});
 				else if (val.body === undefined) val.reply.send(200);
 				else val.reply.send(200, val.body, {'content-type': 'application/xml'});
-				//val.reply.end();
 				val.next();
 				val = yield csp.take(processor.outbound);
 			}
