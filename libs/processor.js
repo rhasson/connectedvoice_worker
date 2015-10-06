@@ -48,7 +48,7 @@ var processRequest = gen.lift(function*(params, route_type) {
 					if ('Digits' in params) body = yield helper.callActionGatherResponse(params);
 					else if ('SmsSid' in params) body = yield helper.callActionSmsResponse(params);
 					else if ('DialCallSid' in params) body = yield helper.callActionDialResponse(params);
-					else body = undefined;
+					else body = yield helper.callActionRouterResponse(params);
 				} else body = yield helper.buildMessageTwiml('The call has already ended.  Goodbye');
 				break;
 			case 'dequeue':

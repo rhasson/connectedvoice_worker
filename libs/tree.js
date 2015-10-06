@@ -6,7 +6,7 @@ class Node {
   constructor(content, root) {
     this.content = content || {};
     this.root = root || false;
-    this.nodes = new Map();
+    this.nodes = [];
   }
 
   isRoot() {
@@ -14,17 +14,15 @@ class Node {
   }
 
   addNode(id, node) {
-    this.nodes.set(id, node);
+    this.nodes['_' + id] = node;
   }
 
   getAllNodes() {
-    let temp = [];
-    for (let i of this.nodes.values()) temp.push(i);
-    return temp;
+    return _.values(this.nodes);
   }
 
   hasNode(id) {
-    return this.nodes.has(id);
+    return !!this.nodes['_' + id];
   }
 
   setContent(content) {
@@ -32,7 +30,7 @@ class Node {
   }
 
   appendNodeTo(to_id, id, node) {
-    let n = this.nodes.get(to_id);
+    let n = this.nodes['_' + to_id];
     n.addNode(id, node);
   }
 
@@ -48,25 +46,25 @@ class Node {
 class Tree {
   constructor(id_key) {
     this.idKey = id_key || 'index';
-    this.tree = new Map();
+    this.tree = [];
     this.rootId = 0;
     this.currIndex = undefined;
   }
 
   setRoot(item) {
-    this.tree.set(item[this.idKey], new Node(item, true));
+    this.tree['_' + item[this.idKey]] = new Node(item, true);
     this.rootId = item[this.idKey];
   }
 
   addBranch(item) {
     //add a branch to the tree
-    let root = this.tree.get(this.rootId);
+    let root = this.tree['_' + this.rootId];
     root.addNode(item[this.idKey], new Node(item));
   }
 
   addNodeToBranch(id, node) {
     //add a node to an existing branch
-    let root = this.tree.get(this.rootId);
+    let root = this.tree['_' + this.rootId];
 
     let check = (id, branch) => {
       //console.log('BRANCH: ', branch)
@@ -76,61 +74,51 @@ class Tree {
         branch.appendNodeTo(id, node[this.idKey], new Node(node));
       } else {
         let nodes = branch.getAllNodes()
-        if (nodes.length > 0) nodes.forEach( (n) => check(n, id) );
+        if (nodes.length > 0) nodes.forEach( (n) => check(id, n) ); //was originally (n, id )
       }
     }
 
     check(id, root);
   }
 
-  findById(id) {
-    id = id || this.rootId;
-    for (let i of this.flatWalk()) {
-      if (i.id === id) return i.node;
+  findById(id, path) {
+    let vals = _.valuesIn(this.tree);
+    let ret;
+    let self = this;
+    let key = path || this.idKey;
+
+    function find(branch) {
+      let nodes = branch.getAllNodes();
+      if (_.get(branch.content, key) === id) return ret = branch;
+      for (let i=0; i < nodes.length; i++) {
+        find(nodes[i]);
+      }
     }
-  }
 
-  findByHash(path, value) {
-    let ret = [];
-
-    for (let i of this.flatWalk()) {
-      let val = _.get(i.node, path);
-      if (val === value) ret.push(i.node);
+    for (let i=0; i < vals.length; i++) {
+      find(vals[i]);
     }
 
     return ret;
   }
 
-  print(branch) {
-    let tree = {};
-    let arr = branch || this.tree;
-    for (let a of arr.entries()) {
-      let id = a.shift();
-      let node = a.shift().get();
-
-      node.nodes = this.print(node.nodes)
-      tree[id] = node;
-    }
-    return tree;
+  findByHash(path, value) {
+    return this.findById(value, path);
   }
 
-  //walks through tree and yield records in order, flattening the tree in the process
+  findChildrenOfByHash(path, value, nativeArray) {
+    let nodes = this.findById(value, path).getAllNodes();
+    if (nativeArray) {
+      return nodes.map(n => { return n.content });
+    } else return nodes;
+  }
+
   * flatWalk(branch) {
     let arr = branch || this.tree;
-    for (let a of arr.entries()) {
-      let id = a.shift();
-      let node = a.shift().get();
-      yield {id: id, node: node.content, children: node.nodes.size};
-      if (node.nodes.size > 0) yield *this.flatWalk(node.nodes)
-    }
-  }
-
-  * walk(branch) {
-    let arr = branch || this.tree;
-    for (let a of arr.entries()) {
-      let id = a.shift();
-      let node = a.shift();
-      yield {id: id, node: node};
+    for (let a in arr) {
+      let node = arr[a]
+      yield {id: a, node: node.content, children: Object.keys(node.nodes).length};
+      if (Object.keys(node.nodes).length > 0) yield *this.flatWalk(node.nodes)
     }
   }
 }

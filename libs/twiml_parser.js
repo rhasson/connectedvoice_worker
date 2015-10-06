@@ -76,10 +76,14 @@ class Parser {
       return tree;
   }
 
+  getTree() {
+    return this.tree;
+  }
+
   buildTwiml(twimlResponse, params, userid) {
     let self = this;
     if (!('legalNodes' in twimlResponse) || !('say' in twimlResponse)) return new Error ('Not a valid TwiML object');
-    let it = this.tree.flatWalk();
+    let it = this.tree.flatWalk();  //TODO: Need to redo this
     let obj = it.next();
 
     while (!obj.done) {
@@ -103,10 +107,10 @@ class Parser {
               let o = {
                 method: "POST",
                 action: config.callbacks.DequeueUrl.replace('%userid', userid),
-                waitUrl: config.callbacks.WaitUrl.replace('%userid', userid),
+                waitUrl: config.callbacks.WaitUrl.replace('%userid', userid) + '/' + item.index,
                 waitUrlMethod: "POST"
               }
-              twiml.enqueue(o, self.DEFAULT_QUEUE_NAME);  //setup a queue with the default name to hold new callers
+              twiml.enqueue(o, userid);  //setup a queue with the name of user_id to hold new callers
             } else {
               item.verb_attributes.method = "POST"
               item.verb_attributes.action = config.callbacks.ActionUrl.replace('%userid', userid) + '/' + item.index;
@@ -180,10 +184,6 @@ class Parser {
     if (arguments.length === 1) return this.tree.findById(id);
     else if (arguments.length === 2) return this.tree.findByHash(id, val);
     else return new Error('Invalid number of arguments');
-  }
-
-  toJSON() {
-    return this.tree.print();
   }
 }
 

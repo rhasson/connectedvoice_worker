@@ -21,7 +21,8 @@ var dbinsert = whennode.lift(db.insert),
 	http = whennode.lift(request);
 
 var CACHE = [];
-var QUEUES = [];
+
+var CallRouter = require('./call_router');
 
 _.templateSettings.interpolate = /{([\s\S]+?)}/g;
 
@@ -43,6 +44,9 @@ module.exports = {
 	}),
 	callActionDialResponse: gen.lift(function*(params) {
 		return yield _callActionDialResponse(params);
+	}),
+	callActionRouterResponse: gen.lift(function*(params) {
+		return yield _callActionRouterResponse(params);
 	}),
 	callDequeueReponse: gen.lift(function*(params) {
 		return yield _callDequeueResponse(params);
@@ -73,14 +77,9 @@ function _voiceCallResponse(params) {
 		})
 		.then(function(resp) {
 			var doc = resp.shift();
-			var tResp;
-			if (params.CallStatus === 'queued') {
-				//
-			} else {
-				tResp = _buildIvrTwiml(doc.actions, params.id, params);
-				if (typeof tResp === 'object') return webtaskRunApi(tResp);
-				else return when.resolve(tResp);
-			}
+			var tResp = _buildIvrTwiml(doc.actions, params.id, params);
+			if (typeof tResp === 'object') return webtaskRunApi(tResp);
+			else return when.resolve(tResp);
 		})
 		.catch(function(err) {
 			console.log('voiceCallResponse ERROR: ', err);
@@ -123,6 +122,8 @@ function _callStatusResponse(params) {
 	
 	params.id = id;
 	params.type = ('SmsSid' in params) ? 'sms_status' : 'call_status';
+
+	CallRouter.updateCallStatus(params.CallSid, params);
 
 	return dbinsert(params).then(function(doc) {
 		var body = doc.shift();
@@ -206,6 +207,15 @@ function _callActionGatherResponse(params) {
 	});
 }
 
+function _callActionRouterResponse(params) {
+	var resp;
+	//var id = new Buffer(params.id, 'base64').toString('utf8');
+	if (CallRouter.isActive(params.CallSid)) {
+		resp = CallRouter.getResponse(params.CallSid, params.id);
+		return when.resolve(resp.toString());
+	} else when.reject(new Error('Call SID was not found'));
+}
+
 function _callActionSmsResponse(params) {
 	console.log('ACTION SMS REQUEST: PARAMS: ', params);
 	var tResp = _buildMessageTwiml('Your message has been sent')
@@ -243,8 +253,10 @@ function _callDequeueResponse(params) {
 	return dbinsert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
+			CallRouter.dequeue(params.CallSid, params.QueueResult);
 			return when.reject(new Error('Failed to save dequeue status record to DB'));
 		} else {
+			CallRouter.dequeue(params.CallSid);
 			return when.resolve();
 		}
 	});
@@ -255,7 +267,10 @@ function _queueWaitResponse(params) {
 	console.log('QUEUE WAIT REQUEST: PARAMS: ', params);
 	var id = new Buffer(params.id, 'base64').toString('utf8');
 	var twiml = TwimlResponse();
-	var curr;
+
+	if (!CallRouter.isQueued(params.CallSid)) {
+		CallRouter.queue(params.CallSid, id, params);
+	}
 
 	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly");
 	twiml.pause({length:10});
@@ -298,7 +313,7 @@ function _buildMessageTwiml(message) {
 function _buildIvrTwiml(acts, userid, vars) {
 	var rTwiml;// = TwimlResponse();
 	var parser = new TwimlParser();
-	var datetime = new Date()
+	var datetime = new Date();
 	var params = cleanUp(vars);
 	var task;
 	var actions = _.cloneDeep(acts);
@@ -326,6 +341,8 @@ function _buildIvrTwiml(acts, userid, vars) {
 	}
 
 	rTwiml = parser.create(actions).buildTwiml(TwimlResponse(), params, userid);
+
+	CallRouter.addTask(vars.CallSid, parser.getTree());
 
 	function cleanUp(p) {
 		return obj = {

@@ -19,7 +19,7 @@ var restify = require('restify'),
 	server.post('/actions/v0/:id/action', postHandlerAction);
 	server.post('/actions/v0/:id/action/:index', postHandlerAction);
 	server.post('/actions/v0/:id/dequeue', postHandlerDequeue);
-	server.post('/actions/v0/:id/wait', postHandlerWait);
+	server.post('/actions/v0/:id/wait/:index', postHandlerWait);
 
 	function postHandlerVoice(request, reply, next) {
 		processor.put(processor.inbound, {
