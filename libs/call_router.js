@@ -31,7 +31,7 @@ class CallRouter {
 	dequeue(csid, status) {
 		if (status === 'hangup') {
 			if (this.activeCalls.has(csid)) return this.activeCalls.delete(csid);
-		} else if (status === 'queue-full' || status === 'system-error') {
+		} else if (status === 'queue-full' || status === 'system-error' || status === 'error') {
 			if (!this.pendingCalls.has(csid)) {
 				if (this.activeCalls.has(csid)) {
 					let call = this.activeCalls.get(csid);
@@ -53,8 +53,7 @@ class CallRouter {
 
 	//check if a particular call sid is in the active state
 	isActive(csid) {
-		console.log('isAction: ', csid)
-		console.log('ACTIVE: ', this.activeCalls)
+		console.log('isActive: ', csid)
 		return this.activeCalls.has(csid);
 	}
 
@@ -138,38 +137,40 @@ class CallRouter {
 
 	getToNumber(csid, index) {
 		//function *gen() { yield* array };  x = gen();  x.next()
-		if (this.activeTasks.has(csid)) {
-			let numbers = this.activeTasks.get(csid);
-			let num = _.find(numbers, {'isUsed': false});
-			let idx;
-			if (num) {
-				idx = _.indexOf(numbers, num);
-				num.isUsed = true;
-				numbers[idx] = num;
-				this.activeTasks.set(csid, numbers);
-				return num;
+		try {
+			if (this.activeTasks.has(csid)) {
+				let numbers = this.activeTasks.get(csid);
+				let num = _.find(numbers, {'isUsed': false});
+				let idx;
+				if (num) {
+					idx = _.indexOf(numbers, num);
+					num.isUsed = true;
+					numbers[idx] = num;
+					this.activeTasks.set(csid, numbers);
+					return num;
+				} else {
+					//all numbers are used up.  try again
+					numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');
+					numbers[0].isUsed = true;
+					this.activeTasks.set(csid, numbers);
+					return numbers[0];
+				}
 			} else {
-				//all numbers are used up.  try again
-				numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');
-				numbers[0].isUsed = true;
-				this.activeTasks.set(csid, numbers);
-				return numbers[0];
+				let tree = this.pendingTasks.get(csid);
+				let actions = tree ? tree.findChildrenOfByHash('index', index, true) : [];
+				let numbers;
+				if (actions.length) {
+					let nums = _.result(_.find(actions, {'verb': 'group'}), 'nouns.text');
+					try { numbers = JSON.parse(nums) }
+					catch(e) { return new Error('Failed to parse group numbers from IVR') }
+					numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');  //initialize each number in the group as not used and sort by priority
+					numbers[0].isUsed = true;
+					this.activeTasks.set(csid, numbers);
+					this.pendingTasks.delete(csid);
+					return numbers[0];
+				} else return new Error('No valid task found');
 			}
-		} else {
-			let tree = this.pendingTasks.get(csid);
-			let actions = tree ? tree.findChildrenOfByHash('index', index, true) : [];
-			let numbers;
-			if (actions.length) {
-				let nums = _.result(_.find(actions, {'verb': 'group'}), 'nouns.text');
-				try { numbers = JSON.parse(nums) }
-				catch(e) { return new Error('Failed to parse group numbers from IVR') }
-				numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');  //initialize each number in the group as not used and sort by priority
-				numbers[0].isUsed = true;
-				this.activeTasks.set(csid, numbers);
-				this.pendingTasks.delete(csid);
-				return numbers[0];
-			} else return new Error('No valid task found');
-		}
+		} catch(e) {console.log('getToNumber Error: ', e)}
 	}
 }
 

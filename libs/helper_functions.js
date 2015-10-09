@@ -272,7 +272,7 @@ function _queueWaitResponse(params) {
 		CallRouter.queue(params.CallSid, id, params);
 	}
 
-	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly");
+	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly", {voice: 'woman'});
 	twiml.pause({length:10});
 	
 	return twiml.toString();	
