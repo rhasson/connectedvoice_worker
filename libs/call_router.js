@@ -53,6 +53,8 @@ class CallRouter {
 
 	//check if a particular call sid is in the active state
 	isActive(csid) {
+		console.log('isAction: ', csid)
+		console.log('ACTIVE: ', this.activeCalls)
 		return this.activeCalls.has(csid);
 	}
 
@@ -68,13 +70,13 @@ class CallRouter {
 
 	getResponse(csid, userid) {
 		let twiml = twilio.TwimlResponse();
-		let call = this.activeCalls.get(csid);
+		//let call = this.activeCalls.get(csid);
 
 		twiml.dial({
 			method: 'POST', 
 			action: config.callbacks.ActionUrl.replace('%userid', userid),
 		}, function(node) {
-			node.queue(userid);
+			node.queue(userid);  //userid is used as the queue name
 		});
 
 		return twiml;
@@ -92,7 +94,8 @@ class CallRouter {
 				console.log('NEW CALL: ', new_call)
 				new_call.original_csid = pending_call.CallSid;
 				self.pendingCalls.delete(pending_call.CallSid);
-				self.activeCalls.set(new_call.CallSid, new_call);
+				let call = formatCallResponseData(new_call, pending_call.id)
+				self.activeCalls.set(call.CallSid, call);
 			})
 			.fail(function(error) {
 				console.log('Call attempt failed: ', error);
@@ -114,7 +117,6 @@ class CallRouter {
 					console.log('ERROR: ', e)
 				}
 			});
-
 			pending_call = yield csp.take(this.callChannel);
 		}
 	}
@@ -122,16 +124,15 @@ class CallRouter {
 	makeCall(to_number, params) {
 		let userid = new Buffer(params.id, 'utf8').toString('base64');
 		console.log('Making Call')
-		let ret = this.client.makeCall({
+		let ret = this.client.accounts(params.AccountSid/*subaccount sid which owns the tn*/).calls.create({
 			url: config.callbacks.ActionUrl.replace('%userid', userid) + '/' + params.index,
 			method: 'POST',
 			to: to_number,
-			from: '5082732203', //From
+			from: params.To,
 			ifMachine: 'hangup',
 			statusCallback: config.callbacks.StatusCallback.replace('%userid', userid),
 			statusCallbackMethod: 'POST'
 		});
-
 		return ret;
 	}
 
@@ -171,5 +172,18 @@ class CallRouter {
 		}
 	}
 }
+
+function formatCallResponseData(call, userid) {
+	let c = {};
+	_.assign(c, call);
+	c.id = userid;
+	c.CallSid = c.sid;
+	c.AccountSid = c.account_sid;
+	c.To = c.to;
+	c.From = c.from;
+
+	return c;
+}
+
 
 module.exports = new CallRouter();
