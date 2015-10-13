@@ -65,7 +65,7 @@ function _voiceCallResponse(params) {
 	if (params.id) {
 		id = new Buffer(params.id, 'base64').toString('utf8');
 		console.log('ACCOUNT ID: ', id)
-		console.log('ACTION VOICE REQUEST: PARAMS: ', params);
+		console.log('VOICE REQUEST: PARAMS: ', params);
 
 		return dbget(id).then(function(resp) {
 			var doc = resp.shift();
@@ -253,7 +253,7 @@ function _callDequeueResponse(params) {
 			CallRouter.dequeue(params.CallSid, params.QueueResult);
 			return when.reject(new Error('Failed to save dequeue status record to DB'));
 		} else {
-			CallRouter.dequeue(params.CallSid);
+			CallRouter.dequeue(params.CallSid, params.QueueResult);
 			return when.resolve();
 		}
 	});

@@ -34,13 +34,12 @@ class CallRouter {
 
 		if (status === 'hangup') {
 			let a_call = this.activeCalls.get(csid);
-			let p_call = this.pendingCalls.get(csid)
+			let p_call = this.pendingCalls.get(csid);
 
-			if (a_call) promises.push(this.hangupCall(a_call.AccountSid, a_call.CallSid));
-			if (p_call) promises.push(this.hangupCall(p_call.AccountSid, p_call.CallSid));
-
-			when.all(promises)
+			when.join(this.hangupCall(a_call),
+					  this.hangupCall(p_call))
 			.then(function(resp) {
+				console.log('CLEARING STATE - ', resp)
 				self.activeCalls.delete(csid);
 				self.pendingCalls.delete(csid);
 			})
@@ -110,12 +109,13 @@ class CallRouter {
 		return twiml;
 	}
 
-	hangupCall(acct_sid, csid) {
-		let ret = this.client.accounts(acct_sid).calls(csid).update({
-			status: "completed"
-		});
+	hangupCall(call) {
+		console.log('Hanging up - ', call)
+		if (!call) return when.resolve();
 
-		return ret;
+		return when(this.client.accounts(call.AccountSid).calls(call.CallSid).update({
+			status: "completed"
+		}));
 	}
 	* processCalls() {
 		let self = this;
