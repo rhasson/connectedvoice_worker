@@ -286,5 +286,9 @@ module.exports = {
 	inbound: inbound,
 	outbound: outbound,
 	take: csp.takeAsync,
-	put: csp.putAsync
+	put: csp.putAsync,
+	repl: {
+		internal: internal,
+		helpers: helper.repl
+	}
 }

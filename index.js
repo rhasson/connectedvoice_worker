@@ -1,8 +1,28 @@
 var restify = require('restify'),
+	repl = require('repl'),
+	net = require('net'),
 	server = restify.createServer(),
 	processor = require('./libs/processor'),
 	csp = require('js-csp');
-	//handlers = require('./libs/route_handlers');
+
+	net.createServer(function(socket) {
+		var replServer = repl.start({
+			prompt: "CV :> ",
+			input: socket,
+			output: socket,
+			terminal: true
+		});
+		
+		replServer.once('exit', function() {
+			socket.end();
+		});
+		
+		replServer.context.server = server;
+		replServer.context.processor = processor.repl.internal;
+		replServer.context.twiml_parser = processor.repl.helpers.twiml_parser;
+		replServer.context.call_router = processor.repl.helpers.call_router;
+
+	}).listen({host: 'localhost', port: 5000});
 
 	server.use(restify.queryParser());
 	server.use(restify.gzipResponse());

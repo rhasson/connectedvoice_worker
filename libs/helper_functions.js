@@ -56,7 +56,11 @@ module.exports = {
 	}),
 	buildMessageTwiml: gen.lift(function*(params) {
 		return yield _buildMessageTwiml(params);
-	})
+	}),
+	repl: {
+		twiml_parser: TwimlParser,
+		call_router: CallRouter
+	}
 }
 
 function _voiceCallResponse(params) {
