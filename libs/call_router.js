@@ -29,21 +29,43 @@ class CallRouter {
 
 	//remove a call from the pedingCall queue
 	dequeue(csid, status) {
+		let self = this;
+		let promises = [];
+
 		if (status === 'hangup') {
-			if (this.activeCalls.has(csid)) return this.activeCalls.delete(csid);
-		} else if (status === 'queue-full' || status === 'system-error' || status === 'error') {
-			if (!this.pendingCalls.has(csid)) {
-				if (this.activeCalls.has(csid)) {
-					let call = this.activeCalls.get(csid);
-					hangupCall(csid);
-					return this.queue(csid, call);
-				}
-				if (this.failedCalls.has(csid)) {
-					let call = this.failedCalls.get(csid);
-					return this.queue(csid, call);
-				}
-			} //TODO: if failed but still in pending queue, re-queue it.  However need to set retry limits
-		} else if (this.pendingCalls.has(csid)) return this.pendingCalls.delete(csid);
+			let a_call = this.activeCalls.get(csid);
+			let p_call = this.pendingCalls.get(csid)
+
+			if (a_call) promises.push(this.hangupCall(a_call.AccountSid, a_call.CallSid));
+			if (p_call) promises.push(this.hangupCall(p_call.AccountSid, p_call.CallSid));
+
+			when.all(promises)
+			.then(function(resp) {
+				self.activeCalls.delete(csid);
+				self.pendingCalls.delete(csid);
+			})
+			.catch(function(err) {
+				console.log('CallRouter: Dequeue|hangup - failed to hangup call - ', err);
+			});
+		} else if (status === 'queue-full') {
+			console.log('CallRouter: Dequeue|Queue-Full');
+			this.activeCalls.delete(csid);
+			this.pendingCalls.delete(csid);
+		} else if ( || status === 'system-error' || status === 'error') {
+			console.log('CallRouter: Dequeue|Error');
+			if (this.activeCalls.has(csid)) {
+				let call = this.activeCalls.get(csid);
+				this.hangupCall(call.AccountSid, call.CallSid);
+				self.activeCalls.delete(csid);
+			}
+			this.pendingCalls.delete(csid);
+		} else if (status === 'bridged' || status === 'leave' || status === 'redirected') {
+			let call = this.pendingCalls.get(csid);
+			this.activeCalls.set(csid, call);
+			this.pendingCalls.delete(csid);
+		} else {
+			this.cleanUpState(csid);
+		}
 	}
 
 	//returns boolean based on if the call sid is in the pending queue
@@ -57,8 +79,8 @@ class CallRouter {
 		return this.activeCalls.has(csid);
 	}
 
-	updateCallStatus(csid, params) {
-		//
+	updateCallStatus(csid, status) {
+		if (status === 'completed') this.cleanUpState(csid);
 	}
 
 	addTask(csid, task) {
@@ -69,18 +91,32 @@ class CallRouter {
 
 	getResponse(csid, userid) {
 		let twiml = twilio.TwimlResponse();
-		//let call = this.activeCalls.get(csid);
+		let call = this.activeCalls.get(csid);
 
-		twiml.dial({
-			method: 'POST', 
-			action: config.callbacks.ActionUrl.replace('%userid', userid),
-		}, function(node) {
-			node.queue(userid);  //userid is used as the queue name
-		});
+		if (this.pendingCalls.has(call.original_csid)) {
+			twiml.dial({
+				method: 'POST', 
+				action: config.callbacks.ActionUrl.replace('%userid', userid),
+			}, function(node) {
+				node.queue(userid);  //userid is used as the queue name
+			});
+		} else {
+			twiml.say('We could not connect your call at this time.  Please try again later', {voice: 'woman'});
+			twiml.hangup();
+			this.cleanUpState(csid);
+			this.cleanUpState(call.original_csid);
+		}
 
 		return twiml;
 	}
 
+	hangupCall(acct_sid, csid) {
+		let ret = this.client.accounts(acct_sid).calls(csid).update({
+			status: "completed"
+		});
+
+		return ret;
+	}
 	* processCalls() {
 		let self = this;
 		let pending_call = yield csp.take(this.callChannel);
@@ -171,6 +207,13 @@ class CallRouter {
 				} else return new Error('No valid task found');
 			}
 		} catch(e) {console.log('getToNumber Error: ', e)}
+	}
+
+	cleanUpState(csid) {
+		this.pendingCalls.delete(csid);
+		this.activeCalls.delete(csid);
+		this.pendingTasks.delete(csid);
+		this.activeTasks.delete(csid);
 	}
 }
 

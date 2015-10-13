@@ -123,7 +123,7 @@ function _callStatusResponse(params) {
 	params.id = id;
 	params.type = ('SmsSid' in params) ? 'sms_status' : 'call_status';
 
-	CallRouter.updateCallStatus(params.CallSid, params);
+	CallRouter.updateCallStatus(params.CallSid, params.CallStatus);
 
 	return dbinsert(params).then(function(doc) {
 		var body = doc.shift();
@@ -243,9 +243,6 @@ function _callActionDialResponse(params) {
 function _callDequeueResponse(params) {
 	console.log('ACTION DEQUEUE REQUEST: PARAMS: ', params);
 	var id = new Buffer(params.id, 'base64').toString('utf8');
-	//var qsid = QUEUES[id] || params.QueueSid;
-	//if (qsid !== undefined && qsid !== params.QueueSid) return when.reject(new Error('Mismatched queues'));
-	//if (qsid === undefined) return when.reject(new Error('Queue not found'));
 
 	params.id = id;
 	params.type = 'dequeue_status';
@@ -275,7 +272,7 @@ function _queueWaitResponse(params) {
 	twiml.say("You are caller " + params.QueuePosition + ". You will be connected shortly", {voice: 'woman'});
 	twiml.pause({length:10});
 	
-	return twiml.toString();	
+	return twiml.toString();
 }
 
 /****************************************************************************************************/
