@@ -51,7 +51,7 @@ class CallRouter {
 			console.log('CallRouter: Dequeue|Queue-Full');
 			this.activeCalls.delete(csid);
 			this.pendingCalls.delete(csid);
-		} else if ( || status === 'system-error' || status === 'error') {
+		} else if (status === 'system-error' || status === 'error') {
 			console.log('CallRouter: Dequeue|Error');
 			if (this.activeCalls.has(csid)) {
 				let call = this.activeCalls.get(csid);
