@@ -12,6 +12,7 @@
     "cloudant": "^1.0.0-beta3",
     "js-csp": "^0.4.1",
     "lodash": "^3.10.1",
+    "lru-cache": "^2.7.0",
     "request": "^2.60.0",
     "restify": "^3.0.1",
     "twilio": "^1.11.1",
