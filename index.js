@@ -21,6 +21,7 @@ var restify = require('restify'),
 		replServer.context.processor = processor.repl.internal;
 		replServer.context.twiml_parser = processor.repl.helpers.twiml_parser;
 		replServer.context.call_router = processor.repl.helpers.call_router;
+		replServer.context.tokens = processor.repl.helpers.tokens;
 
 	}).listen({host: 'localhost', port: 5000});
 
