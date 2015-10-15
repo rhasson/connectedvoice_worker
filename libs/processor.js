@@ -2,7 +2,7 @@ var helper = require('./helper_functions'),
 	gen = require('when/generator'),
 	twilio = require('twilio'),
 	config = require('../config.json'),
-	_ = require('lodash');	
+	_ = require('lodash');
 
 var csp = require('js-csp'),
 	pub = csp.operations.pub,
@@ -86,10 +86,11 @@ publisher = pub(inbound, getTopic);
 sub(publisher, 'call', internal.calls);
 csp.go(function* () {
 	var body;
+	var isValid = false;
 	var value = yield take(internal.calls);
 	console.log('Starting inbound call channel loop');
 	while (value !== csp.CLOSED) {
-		if (isVerifiedTwilioSignature(value.request)) {
+		if (yield helper.verifyRequest(value.request)) {
 			body = yield processRequest(value.request.params, value.route_type);
 		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
 		if (typeof body === 'string') {
@@ -120,7 +121,9 @@ csp.go(function* () {
 	var value = yield take(internal.sms);
 	console.log('Starting inbound sms channel loop');
 	while (value !== csp.CLOSED) {
-		body = yield processRequest(value.request.params, value.route_type);
+		if (yield helper.verifyRequest(value.request)) {
+			body = yield processRequest(value.request.params, value.route_type);
+		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');		
 		if (typeof body === 'string') {
 			value.body = body;
 	 		csp.putAsync(outbound, value);
@@ -149,7 +152,9 @@ csp.go(function* () {
 	var value = yield take(internal.status);
 	console.log('Starting inbound status channel loop');
 	while (value !== csp.CLOSED) {
-		body = yield processRequest(value.request.params, value.route_type);
+		if (yield helper.verifyRequest(value.request)) {
+			body = yield processRequest(value.request.params, value.route_type);
+		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
 		if (typeof body === 'string') {
 			value.body = body;
 	 		csp.putAsync(outbound, value);
@@ -178,7 +183,9 @@ csp.go(function* () {
 	var value = yield take(internal.action);
 	console.log('Starting inbound action channel loop');
 	while (value !== csp.CLOSED) {
-		body = yield processRequest(value.request.params, value.route_type);
+		if (yield helper.verifyRequest(value.request)) {
+			body = yield processRequest(value.request.params, value.route_type);
+		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
 		//hack to get around bug in when library that doesn't unwrap nested promises
 		if (typeof body === 'string') {
 			value.body = body;
@@ -208,7 +215,9 @@ csp.go(function* () {
 	var value = yield take(internal.action);
 	console.log('Starting inbound dequeue channel loop');
 	while (value !== csp.CLOSED) {
-		body = yield processRequest(value.request.params, value.route_type);
+		if (yield helper.verifyRequest(value.request)) {
+			body = yield processRequest(value.request.params, value.route_type);
+		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
 		//hack to get around bug in when library that doesn't unwrap nested promises
 		if (typeof body === 'string') {
 			value.body = body;
@@ -238,7 +247,9 @@ csp.go(function* () {
 	var value = yield take(internal.action);
 	console.log('Starting inbound wait channel loop');
 	while (value !== csp.CLOSED) {
-		body = yield processRequest(value.request.params, value.route_type);
+		if (yield helper.verifyRequest(value.request)) {
+			body = yield processRequest(value.request.params, value.route_type);
+		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
 		//hack to get around bug in when library that doesn't unwrap nested promises
 		if (typeof body === 'string') {
 			value.body = body;
@@ -285,18 +296,6 @@ function update_state(sid, status) {
 
 	STATE[sid] = state;
 	return state;
-}
-
-function isVerifiedTwilioSignature(req) {
-	var header = req.headers['x-twilio-signature'];
-	var url = req.headers['x-forwarded-proto'] + '://' + req.headers['host'] + '/' + req.url;
-	var params = {};
-
-	params = _.assign(params, req.params);
-	delete params.id;
-	delete params.index;
-
-	return twilio.validateRequest(config.twilio.production.auth_token, header, url, params);
 }
 
 module.exports = {
