@@ -3,10 +3,11 @@ var _ = require('lodash'),
 	when = require('when'),
 	whennode = require('when/node'),
 	gen = require('when/generator'),
+	lru = require('lru-cache'),
 	request = require('request'),
 	TwimlParser = require('./twiml_parser'),
 	TwimlResponse = require('twilio').TwimlResponse,
-	twilio = require('twilio')(config.twilio.production.account_sid, config.twilio.production.auth_token),
+	twilio = require('twilio'),
 	cloudant = require('cloudant')({
 		account: config.cloudant.production.account,
 		key: config.cloudant.production.key,
@@ -21,6 +22,12 @@ var dbinsert = whennode.lift(db.insert),
 	http = whennode.lift(request);
 
 var CACHE = [];
+
+var TOKENS = lru({
+		max: 50000,
+		length: function(n) { return n.length },
+		maxAge: 1000 * 60 * 60
+	});
 
 var CallRouter = require('./call_router');
 
@@ -57,9 +64,13 @@ module.exports = {
 	buildMessageTwiml: gen.lift(function*(params) {
 		return yield _buildMessageTwiml(params);
 	}),
+	verifyRequest: gen.lift(function*(req) {
+		return yield _verifyRequest(req);
+	}),
 	repl: {
 		twiml_parser: TwimlParser,
-		call_router: CallRouter
+		call_router: CallRouter,
+		tokens: TOKENS
 	}
 }
 
@@ -281,6 +292,52 @@ function _queueWaitResponse(params) {
 
 /****************************************************************************************************/
 
+function _verifyRequest(req) {
+	var header = req.headers['x-twilio-signature'];
+	var url = req.headers['x-forwarded-proto'] + '://' + req.headers['host'] + '/' + req.url;
+	var params = {};
+	var token;
+
+	params = _.assign(params, req.params);
+	delete params.id;
+	delete params.index;
+
+	token = TOKENS.get(params.AcountSid);
+
+	if (!token) {
+		getTokenFromDb(params.AccountSid)
+		.then(function(tok) {
+			if (tok) {
+				TOKENS.set(params.AccountSid, tok);
+				return when.resolve(twilio.validateRequest(tok, header, url, params));
+			}
+		})
+		.catch(function(err) {
+			console.log('verifyRequest getTokenFromDb: ', err)
+			when.resolve(false);
+		});
+	} else return when.resolve(twilio.validateRequest(token, header, url, params));
+}
+
+function getTokenFromDb(asid) {
+	return dbsearch('searchToken', 'searchToken', {q: 'account_sid:'+asid})
+	.then(function(doc) {
+		var body = doc.shift();
+		var headers = doc.shift();
+		var token;
+		
+		if (headers['statusCode'] !== 200) return when.reject(new Error('DB Search for token returned error - '+headers['status-code']));
+
+		token = _.result(_.find(body.rows, 'fields.account_sid', asid), 'fields.auth_token');
+
+		if (token) return when.resolve(token);
+		else return when.reject(new Error('No token found'));
+	})
+	.catch(function(err) {
+		console.log('getTokenFromDb: ', err)
+		return when.reject(new Error('Failed to get token from DB - ' + err));
+	});
+}
 function _getIvrForUserId(id, to) {
 	if (id) {
 		id = new Buffer(id, 'base64').toString('utf8');
