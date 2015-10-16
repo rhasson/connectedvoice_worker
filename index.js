@@ -1,3 +1,5 @@
+/* @flow */
+
 var restify = require('restify'),
 	repl = require('repl'),
 	net = require('net'),
@@ -97,18 +99,20 @@ var restify = require('restify'),
 	}
 
 	server.listen(9000, function() {
-		console.log('Started Voice API server - ' + new Date());
+		console.log('Started Voice API server ');
 		
 		csp.go(function*() {
 			console.log('Starting outbound channel loop');
 			var val = yield csp.take(processor.outbound);
 			while (val !== csp.CLOSED) {
-				val.reply.header('content-type', 'application/xml');
-				if (val.body instanceof Error) val.reply.send(403, val.body.message, {'content-type': 'application/xml'});
-				else if (val.body === undefined) val.reply.send(200);
-				else val.reply.send(200, val.body, {'content-type': 'application/xml'});
-				val.next();
-				val = yield csp.take(processor.outbound);
+				if (val != undefined) {
+					val.reply.header('content-type', 'application/xml');
+					if (val.body instanceof Error) val.reply.send(403, val.body.message, {'content-type': 'application/xml'});
+					else if (val.body === undefined) val.reply.send(200);
+					else val.reply.send(200, val.body, {'content-type': 'application/xml'});
+					val.next();
+					val = yield csp.take(processor.outbound);
+				}
 			}
 		});
 	});

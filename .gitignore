@@ -2,3 +2,4 @@
 config.json
 test/
 node_modules/
+flow_interfaces/

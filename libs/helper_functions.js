@@ -1,3 +1,5 @@
+/* @flow */
+
 var _ = require('lodash'),
 	config = require('../config.json'),
 	when = require('when'),
@@ -21,7 +23,7 @@ var dbinsert = whennode.lift(db.insert),
 	dbremove = whennode.lift(db.destroy),
 	http = whennode.lift(request);
 
-var CACHE = [];
+var CACHE = {};
 
 var TOKENS = lru({
 		max: 50000,
@@ -149,8 +151,6 @@ function _callStatusResponse(params) {
 			return when.resolve(body);
 		}
 	});
-
-	return when.resolve();
 }
 
 function _callActionGatherResponse(params) {
@@ -403,7 +403,7 @@ function _buildIvrTwiml(acts, userid, vars) {
 	CallRouter.addTask(vars.CallSid, parser.getTree());
 
 	function cleanUp(p) {
-		return obj = {
+		return {
 			caller: p.Caller,
 			callee: p.Called,
 			digits: p.Digits,
@@ -413,7 +413,7 @@ function _buildIvrTwiml(acts, userid, vars) {
 		};
 	}
 
-	return rTwiml.toString();
+	return (rTwiml != undefined ) ? rTwiml.toString() : '';
 }
 
 function webtaskRunApi(task) {

@@ -1,3 +1,5 @@
+/* @flow */
+
 var helper = require('./helper_functions'),
 	gen = require('when/generator'),
 	twilio = require('twilio'),
@@ -90,23 +92,27 @@ csp.go(function* () {
 	var value = yield take(internal.calls);
 	console.log('Starting inbound call channel loop');
 	while (value !== csp.CLOSED) {
-		if (yield helper.verifyRequest(value.request)) {
-			body = yield processRequest(value.request.params, value.route_type);
-		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
-		if (typeof body === 'string') {
-			value.body = body;
-	 		csp.putAsync(outbound, value);
-		} else if (typeof body === 'object') {
-			body.then(function(resp){
-				console.log('GOOD: ', resp)
-				value.body = resp;
+		if (value != undefined) {
+			if (yield helper.verifyRequest(value.request)) {
+				body = yield processRequest(value.request.params, value.route_type);
+			} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
+			if (typeof body === 'string') {
+				value.body = body;
 		 		csp.putAsync(outbound, value);
-			}).catch(function() {
-				console.log('BAD')
-			});
-		} else {
-			value.body = undefined;
-			csp.putAsync(outbound, value);
+			} else if (typeof body === 'object') {
+				body.then(function(resp){
+					console.log('GOOD: ', resp)
+					if (value != undefined) {
+						value.body = resp;
+			 			csp.putAsync(outbound, value);
+			 		}
+				}).catch(function() {
+					console.log('BAD')
+				});
+			} else {
+				value.body = undefined;
+				csp.putAsync(outbound, value);
+			}
 		}
 
 		value = yield take(internal.calls);
@@ -121,23 +127,27 @@ csp.go(function* () {
 	var value = yield take(internal.sms);
 	console.log('Starting inbound sms channel loop');
 	while (value !== csp.CLOSED) {
-		if (yield helper.verifyRequest(value.request)) {
-			body = yield processRequest(value.request.params, value.route_type);
-		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');		
-		if (typeof body === 'string') {
-			value.body = body;
-	 		csp.putAsync(outbound, value);
-		} else if (typeof body === 'object') {
-			body.then(function(resp){
-				console.log('GOOD: ', resp)
-				value.body = resp;
+		if (value != undefined) {
+			if (yield helper.verifyRequest(value.request)) {
+				body = yield processRequest(value.request.params, value.route_type);
+			} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');		
+			if (typeof body === 'string') {
+				value.body = body;
 		 		csp.putAsync(outbound, value);
-			}).catch(function() {
-				console.log('BAD')
-			});
-		} else {
-			value.body = undefined;
-			csp.putAsync(outbound, value);
+			} else if (typeof body === 'object') {
+				body.then(function(resp){
+					console.log('GOOD: ', resp)
+					if (value != undefined) {
+						value.body = resp;
+			 			csp.putAsync(outbound, value);
+			 		}
+				}).catch(function() {
+					console.log('BAD')
+				});
+			} else {
+				value.body = undefined;
+				csp.putAsync(outbound, value);
+			}
 		}
 
 		value = yield take(internal.sms);
@@ -152,23 +162,27 @@ csp.go(function* () {
 	var value = yield take(internal.status);
 	console.log('Starting inbound status channel loop');
 	while (value !== csp.CLOSED) {
-		if (yield helper.verifyRequest(value.request)) {
-			body = yield processRequest(value.request.params, value.route_type);
-		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
-		if (typeof body === 'string') {
-			value.body = body;
-	 		csp.putAsync(outbound, value);
-		} else if (typeof body === 'object') {
-			body.then(function(resp){
-				console.log('GOOD: ', resp)
-				value.body = resp;
+		if (value != undefined) {
+			if (yield helper.verifyRequest(value.request)) {
+				body = yield processRequest(value.request.params, value.route_type);
+			} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
+			if (typeof body === 'string') {
+				value.body = body;
 		 		csp.putAsync(outbound, value);
-			}).catch(function() {
-				console.log('BAD')
-			});
-		} else {
-			value.body = undefined;
-			csp.putAsync(outbound, value);
+			} else if (typeof body === 'object') {
+				body.then(function(resp){
+					console.log('GOOD: ', resp)
+					if (value != undefined) {
+						value.body = resp;
+			 			csp.putAsync(outbound, value);
+			 		}
+				}).catch(function() {
+					console.log('BAD')
+				});
+			} else {
+				value.body = undefined;
+				csp.putAsync(outbound, value);
+			}
 		}
 		
 		value = yield take(internal.status);
@@ -183,24 +197,28 @@ csp.go(function* () {
 	var value = yield take(internal.action);
 	console.log('Starting inbound action channel loop');
 	while (value !== csp.CLOSED) {
-		if (yield helper.verifyRequest(value.request)) {
-			body = yield processRequest(value.request.params, value.route_type);
-		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
-		//hack to get around bug in when library that doesn't unwrap nested promises
-		if (typeof body === 'string') {
-			value.body = body;
-	 		csp.putAsync(outbound, value);
-		} else if (typeof body === 'object') {
-			body.then(function(resp){
-				console.log('GOOD: ', resp)
-				value.body = resp;
+		if (value != undefined) {
+			if (yield helper.verifyRequest(value.request)) {
+				body = yield processRequest(value.request.params, value.route_type);
+			} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
+			//hack to get around bug in when library that doesn't unwrap nested promises
+			if (typeof body === 'string') {
+				value.body = body;
 		 		csp.putAsync(outbound, value);
-			}).catch(function(e) {
-				console.log('BAD: ', e)
-			});
-		} else {
-			value.body = undefined;
-			csp.putAsync(outbound, value);
+			} else if (typeof body === 'object') {
+				body.then(function(resp){
+					console.log('GOOD: ', resp)
+					if (value != undefined) {
+						value.body = resp;
+			 			csp.putAsync(outbound, value);
+			 		}
+				}).catch(function(e) {
+					console.log('BAD: ', e)
+				});
+			} else {
+				value.body = undefined;
+				csp.putAsync(outbound, value);
+			}
 		}
 
 		value = yield take(internal.action);
@@ -215,24 +233,28 @@ csp.go(function* () {
 	var value = yield take(internal.action);
 	console.log('Starting inbound dequeue channel loop');
 	while (value !== csp.CLOSED) {
-		if (yield helper.verifyRequest(value.request)) {
-			body = yield processRequest(value.request.params, value.route_type);
-		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
-		//hack to get around bug in when library that doesn't unwrap nested promises
-		if (typeof body === 'string') {
-			value.body = body;
-	 		csp.putAsync(outbound, value);
-		} else if (typeof body === 'object') {
-			body.then(function(resp){
-				console.log('GOOD: ', resp)
-				value.body = resp;
+		if (value != undefined) {
+			if (yield helper.verifyRequest(value.request)) {
+				body = yield processRequest(value.request.params, value.route_type);
+			} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
+			//hack to get around bug in when library that doesn't unwrap nested promises
+			if (typeof body === 'string') {
+				value.body = body;
 		 		csp.putAsync(outbound, value);
-			}).catch(function(e) {
-				console.log('BAD: ', e)
-			});
-		} else {
-			value.body = undefined;
-			csp.putAsync(outbound, value);
+			} else if (typeof body === 'object') {
+				body.then(function(resp){
+					console.log('GOOD: ', resp)
+					if (value != undefined) {
+						value.body = resp;
+			 			csp.putAsync(outbound, value);
+			 		}
+				}).catch(function(e) {
+					console.log('BAD: ', e)
+				});
+			} else {
+				value.body = undefined;
+				csp.putAsync(outbound, value);
+			}
 		}
 
 		value = yield take(internal.action);
@@ -247,24 +269,28 @@ csp.go(function* () {
 	var value = yield take(internal.action);
 	console.log('Starting inbound wait channel loop');
 	while (value !== csp.CLOSED) {
-		if (yield helper.verifyRequest(value.request)) {
-			body = yield processRequest(value.request.params, value.route_type);
-		} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
-		//hack to get around bug in when library that doesn't unwrap nested promises
-		if (typeof body === 'string') {
-			value.body = body;
-	 		csp.putAsync(outbound, value);
-		} else if (typeof body === 'object') {
-			body.then(function(resp){
-				console.log('GOOD: ', resp)
-				value.body = resp;
+		if (value != undefined) {
+			if (yield helper.verifyRequest(value.request)) {
+				body = yield processRequest(value.request.params, value.route_type);
+			} else body = yield helper.buildMessageTwiml('Failed to verify message.  Goodbye');
+			//hack to get around bug in when library that doesn't unwrap nested promises
+			if (typeof body === 'string') {
+				value.body = body;
 		 		csp.putAsync(outbound, value);
-			}).catch(function(e) {
-				console.log('BAD: ', e)
-			});
-		} else {
-			value.body = undefined;
-			csp.putAsync(outbound, value);
+			} else if (typeof body === 'object') {
+				body.then(function(resp){
+					console.log('GOOD: ', resp)
+					if (value != undefined) {
+						value.body = resp;
+			 			csp.putAsync(outbound, value);
+			 		}
+				}).catch(function(e) {
+					console.log('BAD: ', e)
+				});
+			} else {
+				value.body = undefined;
+				csp.putAsync(outbound, value);
+			}
 		}
 
 		value = yield take(internal.action);

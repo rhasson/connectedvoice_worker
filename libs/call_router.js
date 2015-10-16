@@ -1,3 +1,5 @@
+/* @flow */
+
 'use strict';
 var twilio = require('twilio');
 var config = require('../config.json');
