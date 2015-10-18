@@ -1,40 +1,47 @@
+/* @fow */
+
 'use strict';
 
 var _ = require('lodash');
 
 class Node {
+
+  /*:: content: Object;*/
+  /*:: root: boolean;*/
+  /*:: nodes: any;*/
+
   constructor(content, root) {
     this.content = content || {};
     this.root = root || false;
     this.nodes = [];
   }
 
-  isRoot() {
+  isRoot() /*: boolean*/{
     return this.root;
   }
 
-  addNode(id, node) {
+  addNode(id/*: string*/, node/*: Object*/) {
     this.nodes['_' + id] = node;
   }
 
-  getAllNodes() {
+  getAllNodes() /*: Object*/{
     return _.values(this.nodes);
   }
 
-  hasNode(id) {
+  hasNode(id/*: string*/) /*: boolean*/ {
     return !!this.nodes['_' + id];
   }
 
-  setContent(content) {
+  setContent(content/*: Object*/) {
     this.content = content;
   }
 
-  appendNodeTo(to_id, id, node) {
+  appendNodeTo(to_id/*: string*/, id/*: string*/, node/*: Object*/) {
     let n = this.nodes['_' + to_id];
     n.addNode(id, node);
   }
 
-  get() {
+  get() /*: Object*/ {
     return {
       root: this.root,
       content: this.content,
@@ -44,6 +51,12 @@ class Node {
 }
 
 class Tree {
+
+  /*:: idKey: string;*/
+  /*:: tree: Array<Object>;*/
+  /*:: rootId: number;*/
+  /*:: currIndex: number;*/
+
   constructor(id_key) {
     this.idKey = id_key || 'index';
     this.tree = [];
@@ -51,18 +64,18 @@ class Tree {
     this.currIndex = undefined;
   }
 
-  setRoot(item) {
+  setRoot(item/*: Object*/) {
     this.tree['_' + item[this.idKey]] = new Node(item, true);
     this.rootId = item[this.idKey];
   }
 
-  addBranch(item) {
+  addBranch(item/*: Object*/) {
     //add a branch to the tree
     let root = this.tree['_' + this.rootId];
     root.addNode(item[this.idKey], new Node(item));
   }
 
-  addNodeToBranch(id, node) {
+  addNodeToBranch(id/*: number*/, node/*: Object*/) {
     //add a node to an existing branch
     let root = this.tree['_' + this.rootId];
 
@@ -81,13 +94,13 @@ class Tree {
     check(id, root);
   }
 
-  findById(id, path) {
+  findById(id/*: any*/, path/*: string*/) /*: Object*/ {
     let vals = _.valuesIn(this.tree);
     let ret;
     let self = this;
     let key = path || this.idKey;
 
-    function find(branch) {
+    function find(branch/*:Object*/) {
       let nodes = branch.getAllNodes();
       if (_.get(branch.content, key) === id) return ret = branch;
       for (let i=0; i < nodes.length; i++) {
@@ -102,18 +115,18 @@ class Tree {
     return ret;
   }
 
-  findByHash(path, value) {
+  findByHash(path/*: string*/, value/*: any*/) /*: Object*/ {
     return this.findById(value, path);
   }
 
-  findChildrenOfByHash(path, value, nativeArray) {
+  findChildrenOfByHash(path/*: string*/, value/*: any*/, nativeArray/*: boolean*/) /*: Object*/ {
     let nodes = this.findById(value, path).getAllNodes();
     if (nativeArray) {
       return nodes.map(n => { return n.content });
     } else return nodes;
   }
 
-  * flatWalk(branch) {
+  * flatWalk(branch/*: Object*/) {
     let arr = branch || this.tree;
     for (let a in arr) {
       let node = arr[a]

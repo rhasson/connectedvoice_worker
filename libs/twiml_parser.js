@@ -1,3 +1,5 @@
+/* @flow */
+
 'use strict';
 
 var _ = require('lodash');
@@ -8,7 +10,14 @@ class Parser {
   /* id_key: {string} name of key in parsed object to be used as an ID.
   * ID will be used as key in the Tree to lookup ivr elements
   */
-  constructor(id_key) {
+
+  /*:: currPos: number;*/
+  /*:: list: Array<Object>;*/
+  /*:: tree: Object;*/
+  /*:: idKey: string;*/
+  /*:: DEFAULT_QUEUE_NAME: string;*/
+
+  constructor(id_key/*: any*/) {
     this.currPos = 0;
     this.list = [];
     this.tree;
@@ -16,18 +25,18 @@ class Parser {
     this.DEFAULT_QUEUE_NAME = 'incoming';
   }
 
-  create(records) {
+  create(records/*: Array<Object>*/) /*: any*/ {
     this.currPos = 0;
     //iterate over ivr records parsing each and returning array of ivrs
-    for (let item in records) {
-      this.parse(records[item]);
+    for (let item of records) {   //originally "for x in arr"
+      this.parse(item);   //records[item]);
     }
     //iterate over parsed array of ivrs and build tree
     this.tree = this.buildTree(this.list);
     return this;
   }
 
-  parse(action) {
+  parse(action/*: Object*/) {
     let ret;
     let self = this;
 
@@ -56,7 +65,7 @@ class Parser {
     }
   }
 
-  buildTree(list) {
+  buildTree(list /*: Array<Object>*/) /*: Object*/ {
     let tree = new Tree(this.idKey);
 
       for (var i of list) {
@@ -76,11 +85,11 @@ class Parser {
       return tree;
   }
 
-  getTree() {
+  getTree() /*: Object*/ {
     return this.tree;
   }
 
-  buildTwiml(twimlResponse, params, userid) {
+  buildTwiml(twimlResponse/*: Object*/, params/*: Object*/, userid/*: string*/) /*: Object*/{
     let self = this;
     if (!('legalNodes' in twimlResponse) || !('say' in twimlResponse)) return new Error ('Not a valid TwiML object');
     let it = this.tree.flatWalk();  //TODO: Need to redo this
@@ -91,7 +100,7 @@ class Parser {
     }
 
 
-    function create(twiml, node) {
+    function create(twiml/*: Object*/, node/*: Object*/) {
       let tmpl = undefined;
       let item = node.node;
       //console.log('NODE: ', node)
@@ -180,7 +189,7 @@ class Parser {
     return twimlResponse;
   }
 
-  find(id, val) {
+  find(id/*: any*/, val/*: Object*/) /*: Object*/ {
     if (arguments.length === 1) return this.tree.findById(id);
     else if (arguments.length === 2) return this.tree.findByHash(id, val);
     else return new Error('Invalid number of arguments');

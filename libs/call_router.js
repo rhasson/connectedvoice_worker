@@ -9,6 +9,16 @@ var gen = require('when/generator');
 var _ = require('lodash');
 
 class CallRouter {
+	// Flow annotations.
+	
+	/*:: client: Object; */
+	/*:: activeCalls: Object; */
+	/*:: pendingCalls: Object; */
+	/*:: failedCalls: Object; */
+	/*:: pendingTasks: Object; */
+	/*:: activeTasks: Object; */
+	/*:: callChannel: Object; */
+	
 	constructor() {
 		this.client = new twilio.RestClient(config.twilio.production.account_sid, config.twilio.production.auth_token);
 		this.activeCalls = new Map();
@@ -23,14 +33,14 @@ class CallRouter {
 	}
 
 	//queue new calls passing queue_sid, call_side, and params object
-	queue(csid, userid, params) {
+	queue(csid/*: string*/, userid/*: string*/, params/*:Object*/) {
 		params.id = userid;
 		this.pendingCalls.set(csid, params);
 		csp.putAsync(this.callChannel, params);
 	}
 
 	//remove a call from the pedingCall queue
-	dequeue(csid, status) {
+	dequeue(csid/*: string*/, status/*: string*/) {
 		let self = this;
 		let promises = [];
 
@@ -70,27 +80,27 @@ class CallRouter {
 	}
 
 	//returns boolean based on if the call sid is in the pending queue
-	isQueued(csid) {
+	isQueued(csid/*: string*/) /*: Boolean*/{
 		return this.pendingCalls.has(csid) || this.activeCalls.has(csid);
 	}
 
 	//check if a particular call sid is in the active state
-	isActive(csid) {
+	isActive(csid/*: string*/) /*: Boolean*/{
 		console.log('isActive: ', csid)
 		return this.activeCalls.has(csid);
 	}
 
-	updateCallStatus(csid, status) {
+	updateCallStatus(csid/*: string*/, status/*: string*/) {
 		if (status === 'completed') this.cleanUpState(csid);
 	}
 
-	addTask(csid, task) {
+	addTask(csid/*: string*/, task/*: Object*/) {
 		console.log('Adding Task to: ', csid)
 		console.log('TASK: ', task)
 		this.pendingTasks.set(csid, task);
 	}
 
-	getResponse(csid, userid) {
+	getResponse(csid/*: string*/, userid/*: string*/) /*: Object*/{
 		let twiml = twilio.TwimlResponse();
 		let call = this.activeCalls.get(csid);
 
@@ -111,7 +121,7 @@ class CallRouter {
 		return twiml;
 	}
 
-	hangupCall(call) {
+	hangupCall(call/*: Object*/) /*: Object*/{
 		console.log('Hanging up - ', call)
 		if (!call) return when.resolve();
 
@@ -119,52 +129,61 @@ class CallRouter {
 			status: "completed"
 		}));
 	}
-	* processCalls() {
+	* processCalls() /*: any*/{
 		let self = this;
 		let pending_call = yield csp.take(this.callChannel);
 		while (pending_call !== csp.CLOSED) {
 			console.log('Processing Call')
-			let to_number = this.getToNumber(pending_call.CallSid, pending_call.index);
-			console.log('TO: ', to_number)
-			this.makeCall(to_number.phone_number, pending_call)
-			.then(function(new_call) {
-				console.log('NEW CALL: ', new_call)
-				new_call.original_csid = pending_call.CallSid;
-				self.pendingCalls.delete(pending_call.CallSid);
-				let call = formatCallResponseData(new_call, pending_call.id)
-				self.activeCalls.set(call.CallSid, call);
-			})
-			.fail(function(error) {
-				console.log('Call attempt failed: ', error);
-				try {
-					let retries = ('_retries' in pending_call) ? pending_call['_retries'] : 3;
-					retries--;
-					pending_call['_retries'] = retries;
+			if (pending_call != undefined) {
+				let to_number = this.getToNumber(pending_call.CallSid, pending_call.index);
+				console.log('TO: ', to_number)
+				if (to_number != undefined) {
+					let number = to_number.phone_number;
+					this.makeCall(number, pending_call)
+					.then(function(new_call) {
+						console.log('NEW CALL: ', new_call)
+						if (pending_call != undefined) {
+							new_call.original_csid = pending_call.CallSid;
+							self.pendingCalls.delete(pending_call.CallSid);
+							let call = formatCallResponseData(new_call, pending_call.id)
+							self.activeCalls.set(call.CallSid, call);
+						}
+					})
+					.fail(function(error) {
+						console.log('Call attempt failed: ', error);
+						if (pending_call != undefined) {
+							try {
+								let retries = ('_retries' in pending_call) ? pending_call['_retries'] : 3;
+								retries--;
+								pending_call['_retries'] = retries;
 
-					if (pending_call['_retries'] > 0) {
-						console.log('TRYING')
-						csp.timeout(2000);
-						self.queue(pending_call.CallSid, pending_call.id, pending_call);
-					} else {
-						console.log('Failed to place call after 3 tries.  Giving up');
-						self.pendingCalls.delete(pending_call.CallSid);
-					}
+								if (pending_call['_retries'] > 0) {
+									console.log('TRYING')
+									csp.timeout(2000);
+									self.queue(pending_call.CallSid, pending_call.id, pending_call);
+								} else {
+									console.log('Failed to place call after 3 tries.  Giving up');
+									self.pendingCalls.delete(pending_call.CallSid);
+								}
+							}
+							catch(e) {
+								console.log('ERROR: ', e)
+							}
+						}
+					});
 				}
-				catch(e) {
-					console.log('ERROR: ', e)
-				}
-			});
+			}
 			pending_call = yield csp.take(this.callChannel);
 		}
 	}
 	
-	makeCall(to_number, params) {
+	makeCall(number/*: string*/, params/*: Object*/) /*: Object*/{
 		let userid = new Buffer(params.id, 'utf8').toString('base64');
 		console.log('Making Call')
 		let ret = this.client.accounts(params.AccountSid/*subaccount sid which owns the tn*/).calls.create({
 			url: config.callbacks.ActionUrl.replace('%userid', userid) + '/' + params.index,
 			method: 'POST',
-			to: to_number,
+			to: number,
 			from: params.To,
 			ifMachine: 'hangup',
 			statusCallback: config.callbacks.StatusCallback.replace('%userid', userid),
@@ -173,7 +192,7 @@ class CallRouter {
 		return ret;
 	}
 
-	getToNumber(csid, index) {
+	getToNumber(csid/*: string*/, index/*: string*/) /*: any*/{
 		//function *gen() { yield* array };  x = gen();  x.next()
 		try {
 			if (this.activeTasks.has(csid)) {
@@ -211,7 +230,7 @@ class CallRouter {
 		} catch(e) {console.log('getToNumber Error: ', e)}
 	}
 
-	cleanUpState(csid) {
+	cleanUpState(csid/*: string*/) {
 		this.pendingCalls.delete(csid);
 		this.activeCalls.delete(csid);
 		this.pendingTasks.delete(csid);
@@ -219,7 +238,7 @@ class CallRouter {
 	}
 }
 
-function formatCallResponseData(call, userid) {
+function formatCallResponseData(call/*: Object*/, userid/*: string*/) {
 	let c = {};
 	_.assign(c, call);
 	c.id = userid;
