@@ -294,7 +294,7 @@ function _queueWaitResponse(params) {
 
 function _verifyRequest(req) {
 	var header = req.headers['x-twilio-signature'];
-	var url = req.headers['x-forwarded-proto'] + '://' + req.headers['host'] + '/' + req.url;
+	var url = req.headers['x-forwarded-proto'] + '://' + req.headers['host'] + req.url;
 	var params = {};
 	var token;
 
@@ -305,7 +305,7 @@ function _verifyRequest(req) {
 	token = TOKENS.get(params.AcountSid);
 
 	if (!token) {
-		getTokenFromDb(params.AccountSid)
+		return getTokenFromDb(params.AccountSid)
 		.then(function(tok) {
 			if (tok) {
 				TOKENS.set(params.AccountSid, tok);
@@ -326,7 +326,7 @@ function getTokenFromDb(asid) {
 		var headers = doc.shift();
 		var token;
 		
-		if (headers['statusCode'] !== 200) return when.reject(new Error('DB Search for token returned error - '+headers['status-code']));
+		if (headers['status-code'] !== 200) return when.reject(new Error('DB Search for token returned error - '+headers['status-code']));
 
 		token = _.result(_.find(body.rows, 'fields.account_sid', asid), 'fields.auth_token');
 
