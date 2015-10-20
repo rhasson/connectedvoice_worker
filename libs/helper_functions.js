@@ -1,5 +1,6 @@
 /* @flow */
 
+require('when/monitor/console');
 var _ = require('lodash'),
 	config = require('../config.json'),
 	when = require('when'),
@@ -10,17 +11,7 @@ var _ = require('lodash'),
 	TwimlParser = require('./twiml_parser'),
 	TwimlResponse = require('twilio').TwimlResponse,
 	twilio = require('twilio'),
-	cloudant = require('cloudant')({
-		account: config.cloudant.production.account,
-		key: config.cloudant.production.key,
-		password: config.cloudant.production.password
-	}),
-	db = cloudant.use(config.cloudant.production.db_name);
-
-var dbinsert = whennode.lift(db.insert),
-	dbsearch = whennode.lift(db.search),
-	dbget = whennode.lift(db.get),
-	dbremove = whennode.lift(db.destroy),
+	db = require('./db'),
 	http = whennode.lift(request);
 
 var CACHE = {};
@@ -84,12 +75,12 @@ function _voiceCallResponse(params) {
 		console.log('ACCOUNT ID: ', id)
 		console.log('VOICE REQUEST: PARAMS: ', params);
 
-		return dbget(id).then(function(resp) {
+		return db.get(id).then(function(resp) {
 			var doc = resp.shift();
 			var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: params.To}), 'ivr_id');
 			console.log('IVR ID: ', ivr_id)
 			
-			if (ivr_id !== undefined) return dbget(ivr_id);
+			if (ivr_id !== undefined) return db.get(ivr_id);
 			else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
 		})
 		.then(function(resp) {
@@ -142,7 +133,7 @@ function _callStatusResponse(params) {
 
 	CallRouter.updateCallStatus(params.CallSid, params.CallStatus);
 
-	return dbinsert(params).then(function(doc) {
+	return db.insert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
 			console.log(body);
@@ -176,14 +167,14 @@ function _callActionGatherResponse(params) {
 		}
 	}
 	//entry not in cache, query database, cache entry and respond with twiml
-	return dbget(id).then(function(resp) {
+	return db.get(id).then(function(resp) {
 		var doc = resp.shift();
 		var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: params.To}), 'ivr_id');
 		console.log('IVR ID: ', ivr_id)
 		
 		if (ivr_id !== undefined) {
 			CACHE[id] = {id: ivr_id};
-			return dbget(ivr_id);
+			return db.get(ivr_id);
 		}
 		else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
 	})
@@ -245,7 +236,7 @@ function _callActionDialResponse(params) {
 	params.id = id;
 	params.type = 'dial_status';
 
-	return dbinsert(params).then(function(doc) {
+	return db.insert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
 			return when.reject(new Error('Failed to save dial status record to DB'));
@@ -262,7 +253,7 @@ function _callDequeueResponse(params) {
 	params.id = id;
 	params.type = 'dequeue_status';
 
-	return dbinsert(params).then(function(doc) {
+	return db.insert(params).then(function(doc) {
 		var body = doc.shift();
 		if (!('ok' in body) || !body.ok) {
 			CallRouter.dequeue(params.CallSid, params.QueueResult);
@@ -309,6 +300,7 @@ function _verifyRequest(req) {
 		.then(function(tok) {
 			if (tok) {
 				TOKENS.set(params.AccountSid, tok);
+				//return when.resolve(true);
 				return when.resolve(twilio.validateRequest(tok, header, url, params));
 			}
 		})
@@ -316,17 +308,21 @@ function _verifyRequest(req) {
 			console.log('verifyRequest getTokenFromDb: ', err)
 			when.resolve(false);
 		});
-	} else return when.resolve(twilio.validateRequest(token, header, url, params));
+	} else {
+		//return when.resolve(true);
+		return when.resolve(twilio.validateRequest(token, header, url, params));
+	}
 }
 
 function getTokenFromDb(asid) {
-	return dbsearch('searchToken', 'searchToken', {q: 'account_sid:'+asid})
+	return db.search('searchToken', 'searchToken', {q: 'account_sid:'+asid})
 	.then(function(doc) {
 		var body = doc.shift();
 		var headers = doc.shift();
 		var token;
-		
-		if (headers['status-code'] !== 200) return when.reject(new Error('DB Search for token returned error - '+headers['status-code']));
+		var status_code = ('status-code' in headers) ? headers['status-code'] : ('statusCode' in headers) ? headers['statusCode'] : undefined;
+
+		if (status_code !== 200) return when.reject(new Error('DB Search for token returned error'));
 
 		token = _.result(_.find(body.rows, 'fields.account_sid', asid), 'fields.auth_token');
 
@@ -338,16 +334,17 @@ function getTokenFromDb(asid) {
 		return when.reject(new Error('Failed to get token from DB - ' + err));
 	});
 }
+
 function _getIvrForUserId(id, to) {
 	if (id) {
 		id = new Buffer(id, 'base64').toString('utf8');
 		console.log('ACCOUNT ID: ', id)
-		return dbget(id).then(function(resp) {
+		return db.get(id).then(function(resp) {
 			var doc = resp.shift();
 			var ivr_id = _.result(_.find(doc.twilio.associated_numbers, {phone_number: to}), 'ivr_id');
 			console.log('IVR ID: ', ivr_id)
 			
-			if (ivr_id !== undefined) return dbget(ivr_id);
+			if (ivr_id !== undefined) return db.get(ivr_id);
 			else return when.reject(new Error('Did not find an IVR record for the callee phone number'));
 		})
 		.then(function(resp) {
