@@ -144,7 +144,6 @@ class CallRouter {
 						console.log('NEW CALL: ', new_call)
 						if (pending_call != undefined) {
 							new_call.original_csid = pending_call.CallSid;
-							self.pendingCalls.delete(pending_call.CallSid);
 							let call = formatCallResponseData(new_call, pending_call.id)
 							self.activeCalls.set(call.CallSid, call);
 						}
