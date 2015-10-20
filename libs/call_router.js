@@ -1,11 +1,13 @@
 /* @flow */
 
 'use strict';
+require('when/monitor/console');
 var twilio = require('twilio');
 var config = require('../config.json');
-var csp = require('js-csp');
 var when = require('when');
 var gen = require('when/generator');
+var csp = require('js-csp');
+var db = require('./db');
 var _ = require('lodash');
 
 class CallRouter {
@@ -135,45 +137,51 @@ class CallRouter {
 		while (pending_call !== csp.CLOSED) {
 			console.log('Processing Call')
 			if (pending_call != undefined) {
-				let to_number = this.getToNumber(pending_call.CallSid, pending_call.index);
-				console.log('TO: ', to_number)
-				if (to_number != undefined) {
-					let number = to_number.phone_number;
-					this.makeCall(number, pending_call)
-					.then(function(new_call) {
-						console.log('NEW CALL: ', new_call)
-						if (pending_call != undefined) {
-							new_call.original_csid = pending_call.CallSid;
-							let call = formatCallResponseData(new_call, pending_call.id)
-							self.activeCalls.set(call.CallSid, call);
-						}
-					})
-					.fail(function(error) {
-						console.log('Call attempt failed: ', error);
-						if (pending_call != undefined) {
-							try {
-								let retries = ('_retries' in pending_call) ? pending_call['_retries'] : 3;
-								retries--;
-								pending_call['_retries'] = retries;
-
-								if (pending_call['_retries'] > 0) {
-									console.log('TRYING')
-									csp.timeout(2000);
-									self.queue(pending_call.CallSid, pending_call.id, pending_call);
-								} else {
-									console.log('Failed to place call after 3 tries.  Giving up');
-									self.pendingCalls.delete(pending_call.CallSid);
+				gen.call(function* (csid, index) {
+					try { 
+						let to_number = yield self.getToNumber(csid, index);
+						console.log('TO: ', to_number)
+						if (to_number != undefined && pending_call != undefined) {
+							let number = to_number.phone_number;
+							self.makeCall(number, pending_call)
+							.then(function(new_call) {
+								console.log('NEW CALL: ', new_call)
+								if (pending_call != undefined) {
+									new_call.original_csid = pending_call.CallSid;
+									let call = formatCallResponseData(new_call, pending_call.id)
+									self.activeCalls.set(call.CallSid, call);
 								}
-							}
-							catch(e) {
-								console.log('ERROR: ', e)
-							}
+							})
+							.fail(function(error) {
+								console.log('Call attempt failed: ', error);
+								if (pending_call != undefined) {
+									try {
+										let retries = ('_retries' in pending_call) ? pending_call['_retries'] : 3;
+										retries--;
+										pending_call['_retries'] = retries;
+
+										if (pending_call['_retries'] > 0) {
+											console.log('TRYING')
+											csp.timeout(2000);
+											self.queue(pending_call.CallSid, pending_call.id, pending_call);
+										} else {
+											console.log('Failed to place call after 3 tries.  Giving up');
+											self.pendingCalls.delete(pending_call.CallSid);
+										}
+									}
+									catch(e) {
+										console.log('ERROR: ', e)
+									}
+								}
+							});
 						}
-					});
-				}
+					}
+					catch(e) { console.log('processCalls - getToNumber: failed to get number ', e); }
+				}, pending_call.CallSid, pending_call.index);
+				//let to_number = this.getToNumber(pending_call.CallSid, pending_call.index);
 			}
-			pending_call = yield csp.take(this.callChannel);
 		}
+		pending_call = yield csp.take(this.callChannel);
 	}
 	
 	makeCall(number/*: string*/, params/*: Object*/) /*: Object*/{
@@ -193,40 +201,45 @@ class CallRouter {
 
 	getToNumber(csid/*: string*/, index/*: string*/) /*: any*/{
 		//function *gen() { yield* array };  x = gen();  x.next()
-		try {
-			if (this.activeTasks.has(csid)) {
-				let numbers = this.activeTasks.get(csid);
-				let num = _.find(numbers, {'isUsed': false});
-				let idx;
-				if (num) {
-					idx = _.indexOf(numbers, num);
-					num.isUsed = true;
-					numbers[idx] = num;
-					this.activeTasks.set(csid, numbers);
-					return num;
-				} else {
-					//all numbers are used up.  try again
-					numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');
-					numbers[0].isUsed = true;
-					this.activeTasks.set(csid, numbers);
-					return numbers[0];
-				}
+		var self = this;
+		if (this.activeTasks.has(csid)) {
+			let numbers = this.activeTasks.get(csid);
+			let num = _.find(numbers, {'isUsed': false});
+			let idx;
+			if (num) {
+				idx = _.indexOf(numbers, num);
+				num.isUsed = true;
+				numbers[idx] = num;
+				this.activeTasks.set(csid, numbers);
+				return when.resolve(num);
 			} else {
-				let tree = this.pendingTasks.get(csid);
-				let actions = tree ? tree.findChildrenOfByHash('index', index, true) : [];
-				let numbers;
-				if (actions.length) {
-					let nums = _.result(_.find(actions, {'verb': 'group'}), 'nouns.text');
-					try { numbers = JSON.parse(nums) }
-					catch(e) { return new Error('Failed to parse group numbers from IVR') }
-					numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');  //initialize each number in the group as not used and sort by priority
-					numbers[0].isUsed = true;
-					this.activeTasks.set(csid, numbers);
-					this.pendingTasks.delete(csid);
-					return numbers[0];
-				} else return new Error('No valid task found');
+				//all numbers are used up.  try again
+				numbers = _.sortBy(_.map(numbers, (i) => { i.isUsed = false; return i; }), 'priority');
+				numbers[0].isUsed = true;
+				this.activeTasks.set(csid, numbers);
+				return when.resolve(numbers[0]);
 			}
-		} catch(e) {console.log('getToNumber Error: ', e)}
+		} else {
+			let tree = this.pendingTasks.get(csid);
+			let actions = tree ? tree.findChildrenOfByHash('index', index, true) : [];
+			let numbers;
+			if (actions.length) {
+				let group_id = _.result(_.find(actions, {'verb': 'group'}), 'nouns.text');
+				return db.get(group_id).then(function(doc) {
+					let body = doc.shift();
+					if (body != undefined) {
+						numbers = _.sortBy(_.map(body.members, (i) => { i.isUsed = false; return i; }), 'priority');  //initialize each number in the group as not used and sort by priority
+						numbers[0].isUsed = true;
+						self.activeTasks.set(csid, numbers);
+						self.pendingTasks.delete(csid);
+						return when.resolve(numbers[0]);
+					} else return when.reject(new Error('Returned empty document when looking for group members'));
+				})
+				.catch(function(err) {
+					return when.reject(new Error('Failed to get group members from database - ', err));
+				});
+			} else return when.reject(new Error('No valid task found'));
+		}
 	}
 
 	cleanUpState(csid/*: string*/) {
