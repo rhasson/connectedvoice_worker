@@ -131,7 +131,7 @@ function _callStatusResponse(params) {
 	params.id = id;
 	params.type = ('SmsSid' in params) ? 'sms_status' : 'call_status';
 
-	CallRouter.updateCallStatus(params.CallSid, params.CallStatus);
+	CallRouter.updateCallStatus(params.CallSid, params);
 
 	return db.insert(params).then(function(doc) {
 		var body = doc.shift();
