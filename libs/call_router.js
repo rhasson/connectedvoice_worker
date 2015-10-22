@@ -92,8 +92,14 @@ class CallRouter {
 		return this.activeCalls.has(csid);
 	}
 
-	updateCallStatus(csid/*: string*/, status/*: string*/) {
-		if (status === 'completed') this.cleanUpState(csid);
+	updateCallStatus(csid/*: string*/, call/*: Object*/) {
+		if (('AnsweredBy' in call) && call.AnsweredBy === 'machine') {
+			if (call.CallStatus === 'completed') {
+				let active_call = this.activeCalls.get('csid');
+				this.callNextNumber(active_call.original_csid);
+				this.cleanUpState(csid);
+			}
+		}
 	}
 
 	addTask(csid/*: string*/, task/*: Object*/) {
@@ -131,6 +137,15 @@ class CallRouter {
 			status: "completed"
 		}));
 	}
+
+	callNextNumber(csid/*: string*/) {
+		let pending_call = this.pendingCalls.get(csid);
+
+		if (pending_call != undefined) {
+			this.queue(pending_call.CallSid, pending_call.id, pending_call);
+		}
+	}
+
 	* processCalls() /*: any*/{
 		let self = this;
 		let pending_call = yield csp.take(this.callChannel);
@@ -243,6 +258,9 @@ class CallRouter {
 	}
 
 	cleanUpState(csid/*: string*/) {
+		let call = this.activeCalls.get(csid);
+		if (call != undefined) this.hangupCall(call);
+
 		this.pendingCalls.delete(csid);
 		this.activeCalls.delete(csid);
 		this.pendingTasks.delete(csid);
