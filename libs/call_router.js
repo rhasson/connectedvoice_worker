@@ -97,8 +97,8 @@ class CallRouter {
 			if (call.CallStatus === 'completed') {
 				let active_call = this.activeCalls.get(csid);
 				if (active_call != undefined) {
-					this.callNextNumber(active_call.original_csid);
 					this.cleanUpState(csid);
+					this.callNextNumber(active_call.original_csid);
 				}
 			}
 		}
