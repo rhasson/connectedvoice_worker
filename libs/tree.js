@@ -53,31 +53,31 @@ class Node {
 class Tree {
 
   /*:: idKey: string;*/
-  /*:: tree: Array<Object>;*/
+  /*:: tree: Object;*/
   /*:: rootId: number;*/
   /*:: currIndex: number;*/
 
   constructor(id_key/*: string*/) {
     this.idKey = id_key || 'index';
-    this.tree = [];
+    this.tree = {};
     this.rootId = 0;
     this.currIndex = 0;
   }
 
   setRoot(item/*: Object*/) {
-    this.tree['_' + item[this.idKey]] = new Node(item, true);
+    this.tree[item[this.idKey]] = new Node(item, true);
     this.rootId = item[this.idKey];
   }
 
   addBranch(item/*: Object*/) {
     //add a branch to the tree
-    let root = this.tree['_' + this.rootId];
+    let root = this.tree[this.rootId];
     root.addNode(item[this.idKey], new Node(item));
   }
 
   addNodeToBranch(id/*: number*/, node/*: Object*/) {
     //add a node to an existing branch
-    let root = this.tree['_' + this.rootId];
+    let root = this.tree[this.rootId];
 
     let check = (id, branch) => {
       //console.log('BRANCH: ', branch)
