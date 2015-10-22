@@ -141,6 +141,7 @@ class CallRouter {
 					try { 
 						let to_number = yield self.getToNumber(csid, index);
 						console.log('TO: ', to_number)
+						if (to_number instanceof Error) throw new Error(to_number);
 						if (to_number != undefined && pending_call != undefined) {
 							let number = to_number.phone_number;
 							self.makeCall(number, pending_call)
@@ -175,13 +176,12 @@ class CallRouter {
 								}
 							});
 						}
-					}
-					catch(e) { console.log('processCalls - getToNumber: failed to get number ', e); }
+					} catch(e) { console.log('processCalls - getToNumber: failed to get number ', e); return false;}
 				}, pending_call.CallSid, pending_call.index);
 				//let to_number = this.getToNumber(pending_call.CallSid, pending_call.index);
 			}
+			pending_call = yield csp.take(this.callChannel);
 		}
-		pending_call = yield csp.take(this.callChannel);
 	}
 	
 	makeCall(number/*: string*/, params/*: Object*/) /*: Object*/{
