@@ -95,9 +95,11 @@ class CallRouter {
 	updateCallStatus(csid/*: string*/, call/*: Object*/) {
 		if (('AnsweredBy' in call) && call.AnsweredBy === 'machine') {
 			if (call.CallStatus === 'completed') {
-				let active_call = this.activeCalls.get('csid');
-				this.callNextNumber(active_call.original_csid);
-				this.cleanUpState(csid);
+				let active_call = this.activeCalls.get(csid);
+				if (active_call != undefined) {
+					this.callNextNumber(active_call.original_csid);
+					this.cleanUpState(csid);
+				}
 			}
 		}
 	}
