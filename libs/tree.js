@@ -1,4 +1,4 @@
-/* @fow */
+/* @flow */
 
 'use strict';
 
@@ -57,11 +57,11 @@ class Tree {
   /*:: rootId: number;*/
   /*:: currIndex: number;*/
 
-  constructor(id_key) {
+  constructor(id_key/*: string*/) {
     this.idKey = id_key || 'index';
     this.tree = [];
     this.rootId = 0;
-    this.currIndex = undefined;
+    this.currIndex = 0;
   }
 
   setRoot(item/*: Object*/) {
@@ -94,15 +94,18 @@ class Tree {
     check(id, root);
   }
 
-  findById(id/*: any*/, path/*: string*/) /*: Object*/ {
+  findById(path/*: string*/, value/*: any*/) /*: any*/ {
     let vals = _.valuesIn(this.tree);
     let ret;
     let self = this;
     let key = path || this.idKey;
 
-    function find(branch/*:Object*/) {
+    function find(branch/*:Object*/) /*: any*/{
       let nodes = branch.getAllNodes();
-      if (_.get(branch.content, key) === id) return ret = branch;
+      if (_.get(branch.content, key) === value) {
+        ret = branch;
+        return;
+      }
       for (let i=0; i < nodes.length; i++) {
         find(nodes[i]);
       }
@@ -116,17 +119,19 @@ class Tree {
   }
 
   findByHash(path/*: string*/, value/*: any*/) /*: Object*/ {
-    return this.findById(value, path);
+    return this.findById(path, value);
   }
 
-  findChildrenOfByHash(path/*: string*/, value/*: any*/, nativeArray/*: boolean*/) /*: Object*/ {
-    let nodes = this.findById(value, path).getAllNodes();
-    if (nativeArray) {
+  findChildrenOfByHash(path/*: string*/, value/*: any*/, nativeArray/*: boolean*/) /*: Array<Object>*/ {
+    let node = this.findById(path, value);
+    let nodes = (node != undefined) ? node.getAllNodes() : [];
+
+    if (nativeArray && nodes.length > 0) {
       return nodes.map(n => { return n.content });
     } else return nodes;
   }
 
-  * flatWalk(branch/*: Object*/) {
+  * flatWalk(branch/*: Object*/) /*: any*/{
     let arr = branch || this.tree;
     for (let a in arr) {
       let node = arr[a]
